@@ -1,0 +1,71 @@
+.login-page-wrapper {
+  min-height: calc(100vh - var(--header-height) - 4rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.login-container-card {
+  max-width: 480px;
+  width: 100%;
+  padding: 2.5rem 2rem;
+}
+
+.login-header-section {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.login-logo-box {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  background: var(--primary-soft);
+  border: 1.5px solid var(--primary-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  margin: 0 auto 1rem auto;
+}
+
+.login-header-section h2 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-main);
+  margin-bottom: 0.4rem;
+}
+
+.login-header-section p {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.login-farmer-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+}
+
+.clerk-signin-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#clerk-captcha {
+  width: 100%;
+  min-height: 70px;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+
+.login-missing-key {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  text-align: center;
+}

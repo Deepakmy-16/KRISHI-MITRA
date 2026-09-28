@@ -1,0 +1,227 @@
+.kisan-top-header {
+  height: var(--header-height);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2rem;
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.header-left-section {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex: 1;
+  max-width: 500px;
+}
+
+.mobile-hamburger-btn {
+  display: none;
+  padding: 0.5rem;
+  border-radius: var(--radius-md);
+  color: var(--text-main);
+}
+
+.mobile-hamburger-btn:hover {
+  background: #f1f5f9;
+}
+
+.header-search-form {
+  position: relative;
+  width: 100%;
+}
+
+.search-input-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-light);
+  pointer-events: none;
+}
+
+.header-search-input {
+  width: 100%;
+  padding: 0.65rem 1rem 0.65rem 2.6rem;
+  font-size: 0.9rem;
+  border: 1.5px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: #f8fafc;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.header-search-input:focus {
+  background: #ffffff;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15);
+}
+
+.header-right-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.btn-voice-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  border: 1px solid var(--primary-border);
+  padding: 0.5rem 0.95rem;
+  border-radius: var(--radius-full);
+  font-size: 0.85rem;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.btn-voice-header:hover {
+  background: var(--primary);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(21, 128, 61, 0.2);
+}
+
+.lang-select-wrapper select {
+  padding: 0.5rem 0.85rem;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--border-subtle);
+  background: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-main);
+  outline: none;
+  cursor: pointer;
+}
+
+.lang-select-wrapper select:focus {
+  border-color: var(--primary);
+}
+
+.header-icon-btn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--border-subtle);
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+}
+
+.header-icon-btn:hover {
+  background: #f8fafc;
+  color: var(--primary);
+  border-color: var(--primary-border);
+}
+
+.alert-ping-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  background: var(--danger);
+  border-radius: 50%;
+  border: 1.5px solid #ffffff;
+}
+
+.header-farmer-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.35rem 0.75rem 0.35rem 0.35rem;
+  border-radius: var(--radius-full);
+  background: #f8fafc;
+  border: 1.5px solid var(--border-subtle);
+  transition: all 0.2s ease;
+}
+
+.header-farmer-badge:hover {
+  border-color: var(--primary-border);
+  background: var(--primary-soft);
+}
+
+.farmer-badge-photo {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid var(--primary);
+}
+
+.farmer-badge-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.farmer-badge-name {
+  font-size: 0.825rem;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.1;
+}
+
+.clerk-verified-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.btn-header-signin {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-full);
+  background: var(--primary);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.btn-header-signin:hover {
+  background: var(--primary-hover);
+}
+
+@media (max-width: 1024px) {
+  .mobile-hamburger-btn {
+    display: flex;
+  }
+  .kisan-top-header {
+    padding: 0 1rem;
+  }
+  .voice-btn-text {
+    display: none;
+  }
+  .header-search-form {
+    max-width: 180px;
+  }
+}
+
+@media (max-width: 640px) {
+  .header-search-form {
+    display: none;
+  }
+  .lang-select-wrapper select {
+    font-size: 0.75rem;
+    padding: 0.4rem 0.5rem;
+  }
+  .farmer-badge-text {
+    display: none;
+  }
+}

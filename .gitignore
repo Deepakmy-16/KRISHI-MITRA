@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# Secrets & Environment variables
+.env
+.env.*
+!.env.example
+
+# Python cache & virtual environment
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+
+# Large Model weights (>100MB exceeds GitHub limits)
+*.pt
+*.pth
+*.h5
+*.keras
+*.onnx
+
+# Databases & Dynamic Cache
+*.db
+*.sqlite
+*.sqlite3
+backend/users.db
+backend/data/alerts.db
+backend/data/live_crops.json
+backend/data/live_schemes.json
+
+# Build outputs
+frontend/build/
+dist/
+.cache/
+
+

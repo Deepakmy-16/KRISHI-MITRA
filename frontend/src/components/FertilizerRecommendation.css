@@ -1,0 +1,32 @@
+.fertilizer-page {
+  padding: 30px;
+  background: #f1f8e9;
+  min-height: 100vh;
+}
+
+.fertilizer-page h2 {
+  color: #2e7d32;
+  margin-bottom: 20px;
+}
+
+.crop-select {
+  padding: 12px;
+  width: 300px;
+  border-radius: 8px;
+  border: 1px solid #4caf50;
+  margin-bottom: 25px;
+}
+
+.fertilizer-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.fertilizer-card {
+  background: white;
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  border-left: 6px solid #4caf50;
+}
