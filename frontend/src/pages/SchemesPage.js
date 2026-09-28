@@ -10,6 +10,7 @@ import {
   ArrowUpRight
 } from "../components/Icons";
 import "./SchemesPage.css";
+import API_BASE_URL from "../config";
 
 const SchemesPage = () => {
   const [schemes, setSchemes] = useState([]);
@@ -26,7 +27,7 @@ const SchemesPage = () => {
   useEffect(() => {
     const fetchSchemes = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/live-schemes");
+        const response = await fetch(`${API_BASE_URL}/api/live-schemes`);
         if (response.ok) {
           const liveData = await response.json();
           const combined = [...liveData];
@@ -112,7 +113,7 @@ const SchemesPage = () => {
   const triggerUpdate = async () => {
     setLoadingSchemes(true);
     try {
-      const response = await fetch("http://localhost:5000/api/update-schemes");
+      const response = await fetch(`${API_BASE_URL}/api/update-schemes`);
       if (response.ok) {
         const liveData = await response.json();
         const combined = [...liveData];

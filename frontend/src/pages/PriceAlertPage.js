@@ -13,8 +13,9 @@ import {
   SproutIcon
 } from "../components/Icons";
 import "./PriceAlertPage.css";
+import API_BASE_URL from "../config";
 
-const BACKEND_URL = "http://localhost:5000";
+const BACKEND_URL = API_BASE_URL;
 
 const DEFAULT_CROPS = [
   "Wheat", "Rice", "Tomato", "Potato", "Onion",

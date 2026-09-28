@@ -18,6 +18,7 @@ import {
   ArrowUpRight
 } from "../components/Icons";
 import "./Dashboard.css";
+import API_BASE_URL from "../config";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -46,7 +47,7 @@ function Dashboard() {
   const t = translations[lang] || translations.en;
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/data")
+    fetch(`${API_BASE_URL}/api/data`)
       .then((res) => res.json())
       .then((json) => {
         if (Array.isArray(json)) {

@@ -5,6 +5,7 @@ import "leaflet/dist/leaflet.css";
 import translations from "../utils/translations";
 import { MapPinIcon, Volume2Icon, SearchIcon, SparklesIcon } from "../components/Icons";
 import "./MapPage.css";
+import API_BASE_URL from "../config";
 
 // Marker Icons
 const redIcon = new L.Icon({
@@ -67,7 +68,7 @@ const MapPage = () => {
 
     const fetchData = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/data");
+        const response = await fetch(`${API_BASE_URL}/api/data`);
         const data = await response.json();
         setAllData(data);
 

@@ -3,6 +3,7 @@ import ComparisonChart from "../components/ComparisonChart";
 import { speakComparison } from "../utils/speakPrice";
 import translations from "../utils/translations";
 import { BarChart3Icon, SproutIcon, SparklesIcon, Volume2Icon } from "../components/Icons";
+import API_BASE_URL from "../config";
 
 function ComparisonPage() {
   const [data, setData] = useState([]);
@@ -13,7 +14,7 @@ function ComparisonPage() {
   const t = translations[lang] || translations.en;
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/data")
+    fetch(`${API_BASE_URL}/api/data`)
       .then((res) => res.json())
       .then((json) => {
         if (Array.isArray(json)) setData(json);

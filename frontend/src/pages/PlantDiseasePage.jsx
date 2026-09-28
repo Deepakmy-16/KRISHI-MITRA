@@ -15,8 +15,9 @@ import {
   ChevronUpIcon
 } from "../components/Icons";
 import "./PlantDiseasePage.css";
+import API_BASE_URL from "../config";
 
-const API_BASE = "http://localhost:5000";
+const API_BASE = API_BASE_URL;
 
 function PlantDiseasePage() {
   const [file, setFile] = useState(null);

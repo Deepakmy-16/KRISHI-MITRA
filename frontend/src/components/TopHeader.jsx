@@ -12,6 +12,7 @@ import {
   SparklesIcon
 } from "./Icons";
 import "./TopHeader.css";
+import API_BASE_URL from "../config";
 
 function TopHeader({ onOpenSidebar }) {
   const { user } = useAuth();
@@ -25,7 +26,7 @@ function TopHeader({ onOpenSidebar }) {
     setLang(saved);
 
     // Fetch market data for voice speaker
-    fetch("http://localhost:5000/api/data")
+    fetch(`${API_BASE_URL}/api/data`)
       .then((res) => res.json())
       .then((json) => {
         if (Array.isArray(json)) setMarketData(json);

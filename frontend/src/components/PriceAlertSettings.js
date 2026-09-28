@@ -2,8 +2,9 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { BellRingIcon, CheckCircle2Icon } from "./Icons";
 import "./PriceAlertSettings.css";
+import API_BASE_URL from "../config";
 
-const BACKEND_URL = "http://localhost:5000";
+const BACKEND_URL = API_BASE_URL;
 
 function toE164India(value) {
   const digits = String(value || "").replace(/\D/g, "");

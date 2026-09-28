@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import translations from "../utils/translations";
 import { BotIcon, MicIcon, SendIcon, SparklesIcon, Volume2Icon, RefreshCwIcon } from "../components/Icons";
 import "./AssistantPage.css";
+import API_BASE_URL from "../config";
 
 function AssistantPage() {
   const lang = localStorage.getItem("lang") || "en";
@@ -65,7 +66,7 @@ function AssistantPage() {
     setLoading(true);
 
     try {
-      const response = await fetch("http://localhost:5000/api/chat", {
+      const response = await fetch(`${API_BASE_URL}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: textToSend, language: lang })
