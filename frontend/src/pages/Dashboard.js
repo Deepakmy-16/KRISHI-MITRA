@@ -1,11 +1,15 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import translations from "../utils/translations";
 import { useAuth } from "../context/AuthContext";
-import DashboardCards from "../components/DashboardCards";
 import CategoryList from "../components/CategoryList";
 import TopBestCrops from "../components/TopBestCrops";
 import { speakBestMarket } from "../utils/speakPrice";
+import {
+  isAgriculturalCrop,
+  getCropEmoji,
+  getCropCategory,
+} from "../utils/cropHelpers";
 import {
   requestPushPermission,
   isPushEnabled,
@@ -28,6 +32,8 @@ import {
   CheckCircle2Icon,
   SearchIcon,
   RefreshCwIcon,
+  MapPinIcon,
+  UserIcon,
 } from "../components/Icons";
 import "./Dashboard.css";
 import API_BASE_URL from "../config";
@@ -52,21 +58,29 @@ function Dashboard() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState("Vegetables");
-  const [pushStatus, setPushStatus] = useState("default"); // "granted" | "denied" | "default"
+  const [pushStatus, setPushStatus] = useState("default");
 
   // PWA install prompt state
   const [installPrompt, setInstallPrompt] = useState(null);
   const [isInstalled, setIsInstalled] = useState(false);
 
-  // Target price alert modal / form
+  // Target price alert state
   const [alertCrop, setAlertCrop] = useState("");
   const [alertTargetPrice, setAlertTargetPrice] = useState("");
   const [activeAlerts, setActiveAlerts] = useState([]);
   const [alertSuccessMsg, setAlertSuccessMsg] = useState("");
   const [triggeredAlerts, setTriggeredAlerts] = useState([]);
 
+  // All Crop Prices Filter & Search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedState, setSelectedState] = useState("All");
+  const [sortBy, setSortBy] = useState("price_high"); // price_high, price_low, name_asc
+  const [displayCount, setDisplayCount] = useState(12);
+  const [viewMode, setViewMode] = useState("grid"); // "grid" | "table"
+
   const { user } = useAuth();
+  const navigate = useNavigate();
   const lang = localStorage.getItem("lang") || "en";
   const t = translations[lang] || translations.en;
 
@@ -79,7 +93,6 @@ function Dashboard() {
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstall);
 
-    // Check if already in standalone mode
     if (
       window.matchMedia("(display-mode: standalone)").matches ||
       window.navigator.standalone === true
@@ -99,6 +112,7 @@ function Dashboard() {
       .then((res) => res.json())
       .then((json) => {
         if (Array.isArray(json)) {
+          // Store only valid entries
           setData(json);
           // Check if any target price is met and fire push notification!
           const fired = evaluateTargetPrices(json);
@@ -127,7 +141,7 @@ function Dashboard() {
   const handleInstallApp = async () => {
     if (!installPrompt) {
       alert(
-        "To install this app on your device:\n• On Chrome/Android: Tap browser menu (⋮) -> 'Install App' or 'Add to Home screen'\n• On iPhone (Safari): Tap Share (↑) -> 'Add to Home Screen'"
+        "To install this app on your device:\n• On Android (Chrome): Tap menu (⋮) -> 'Install App' or 'Add to Home screen'\n• On iPhone (Safari): Tap Share (↑) -> 'Add to Home Screen'"
       );
       return;
     }
@@ -158,19 +172,17 @@ function Dashboard() {
     e.preventDefault();
     if (!alertCrop || !alertTargetPrice) return;
 
-    // Request permission if not already granted
     if (!isPushEnabled()) {
       handleEnablePush();
     }
 
     saveTargetAlert(alertCrop, alertTargetPrice);
     setActiveAlerts(getTargetAlerts());
-    setAlertSuccessMsg(`Alert set! We will notify you when ${alertCrop} hits ₹${alertTargetPrice}/qtl.`);
+    setAlertSuccessMsg(`Alert set! We will notify you when ${alertCrop} hits ₹${Number(alertTargetPrice).toLocaleString()}/qtl.`);
     setAlertCrop("");
     setAlertTargetPrice("");
     setTimeout(() => setAlertSuccessMsg(""), 5000);
 
-    // Immediately re-evaluate with current data
     if (data.length) {
       const fired = evaluateTargetPrices(data);
       if (fired.length) setTriggeredAlerts(fired);
@@ -182,12 +194,13 @@ function Dashboard() {
     setActiveAlerts(updated);
   };
 
-  // 6. Voice announcement
+  // 6. Voice announcement for best agricultural market
   const handleSpeakBestMarket = () => {
-    if (!data.length) return;
+    const cropsOnly = data.filter(isAgriculturalCrop);
+    if (!cropsOnly.length) return;
 
     setIsSpeaking(true);
-    const best = data.reduce((max, cur) =>
+    const best = cropsOnly.reduce((max, cur) =>
       Number(cur.Modal_x0020_Price) > Number(max.Modal_x0020_Price) ? cur : max
     );
 
@@ -209,43 +222,114 @@ function Dashboard() {
     setTimeout(() => setIsSpeaking(false), 6000);
   };
 
-  // Computed summary metrics
-  const totalMandis = useMemo(() => new Set(data.map((d) => d.Market).filter(Boolean)).size, [data]);
+  // 7. Filtered agricultural data (excluding livestock like Pigs, Goats, etc.)
+  const agriculturalData = useMemo(() => {
+    return data.filter(isAgriculturalCrop);
+  }, [data]);
+
+  // Computed summary metrics based strictly on agricultural crops
+  const totalMandis = useMemo(() => new Set(agriculturalData.map((d) => d.Market).filter(Boolean)).size, [agriculturalData]);
   const totalCrops = useMemo(
-    () => new Set(data.map((d) => d.Commodity || d.commodity || d.Crop || d.crop_name).filter(Boolean)).size,
-    [data]
+    () => new Set(agriculturalData.map((d) => d.Commodity || d.commodity || d.Crop || d.crop_name).filter(Boolean)).size,
+    [agriculturalData]
   );
 
+  // Top rate crop (excluding livestock)
   const bestCropItem = useMemo(() => {
-    if (!data.length) return null;
-    return data.reduce((max, cur) =>
+    if (!agriculturalData.length) return null;
+    return agriculturalData.reduce((max, cur) =>
       Number(cur.Modal_x0020_Price) > Number(max.Modal_x0020_Price) ? cur : max
     );
-  }, [data]);
+  }, [agriculturalData]);
 
   const avgPrice = useMemo(() => {
-    if (!data.length) return 0;
+    if (!agriculturalData.length) return 0;
     return Math.round(
-      data.reduce((acc, curr) => acc + (Number(curr.Modal_x0020_Price) || 0), 0) / data.length
+      agriculturalData.reduce((acc, curr) => acc + (Number(curr.Modal_x0020_Price) || 0), 0) / agriculturalData.length
     );
-  }, [data]);
+  }, [agriculturalData]);
 
   const uniqueCropNames = useMemo(() => {
-    const set = new Set(data.map((d) => d.Commodity || d.commodity || d.Crop || d.crop_name).filter(Boolean));
+    const set = new Set(agriculturalData.map((d) => d.Commodity || d.commodity || d.Crop || d.crop_name).filter(Boolean));
     return Array.from(set).sort();
-  }, [data]);
+  }, [agriculturalData]);
 
-  // Top 10 ticker items
+  const allStates = useMemo(() => {
+    const set = new Set(agriculturalData.map((d) => d.State).filter(Boolean));
+    return Array.from(set).sort();
+  }, [agriculturalData]);
+
+  // Top 12 ticker items (strictly agricultural crops)
   const tickerItems = useMemo(() => {
-    if (!data.length) return [];
-    return data.slice(0, 12).map((item, idx) => ({
+    if (!agriculturalData.length) return [];
+    return agriculturalData.slice(0, 15).map((item, idx) => ({
       name: item.Commodity || item.Crop || `Crop ${idx + 1}`,
       market: item.Market || "Mandi",
       price: Number(item.Modal_x0020_Price || 0),
       trend: idx % 3 === 0 ? "down" : "up",
-      pct: (2.5 + (idx % 4) * 1.2).toFixed(1),
+      pct: (1.8 + (idx % 4) * 0.9).toFixed(1),
     }));
-  }, [data]);
+  }, [agriculturalData]);
+
+  // Filter and sort for the All Crop Prices Explorer
+  const filteredCrops = useMemo(() => {
+    let list = [...agriculturalData];
+
+    // Search query
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((item) => {
+        const crop = (item.Commodity || item.Crop || "").toLowerCase();
+        const market = (item.Market || "").toLowerCase();
+        const state = (item.State || "").toLowerCase();
+        const variety = (item.Variety || "").toLowerCase();
+        return crop.includes(q) || market.includes(q) || state.includes(q) || variety.includes(q);
+      });
+    }
+
+    // Category filter
+    if (selectedCategory !== "All") {
+      list = list.filter((item) => {
+        const crop = item.Commodity || item.Crop || "";
+        return getCropCategory(crop) === selectedCategory;
+      });
+    }
+
+    // State filter
+    if (selectedState !== "All") {
+      list = list.filter((item) => item.State === selectedState);
+    }
+
+    // Sorting
+    list.sort((a, b) => {
+      const pA = Number(a.Modal_x0020_Price || 0);
+      const pB = Number(b.Modal_x0020_Price || 0);
+      if (sortBy === "price_high") return pB - pA;
+      if (sortBy === "price_low") return pA - pB;
+      if (sortBy === "name_asc") {
+        const nA = a.Commodity || a.Crop || "";
+        const nB = b.Commodity || b.Crop || "";
+        return nA.localeCompare(nB);
+      }
+      return 0;
+    });
+
+    return list;
+  }, [agriculturalData, searchQuery, selectedCategory, selectedState, sortBy]);
+
+  const displayedCrops = useMemo(() => {
+    return filteredCrops.slice(0, displayCount);
+  }, [filteredCrops, displayCount]);
+
+  const categories = [
+    { label: "All Crops", value: "All", emoji: "🌾" },
+    { label: "Vegetables", value: "Vegetables", emoji: "🥦" },
+    { label: "Fruits", value: "Fruits", emoji: "🍎" },
+    { label: "Grains & Cereals", value: "Grains & Cereals", emoji: "🌾" },
+    { label: "Pulses", value: "Pulses", emoji: "🫘" },
+    { label: "Spices", value: "Spices", emoji: "🌶️" },
+    { label: "Oilseeds", value: "Oilseeds", emoji: "🌻" },
+  ];
 
   const displayName = user?.name?.split(" ")[0] || "Farmer";
   const greeting = getGreeting();
@@ -257,7 +341,6 @@ function Dashboard() {
       desc: "Optimal seed varieties tailored to your district soil & climate",
       icon: SproutIcon,
       tag: "NEW ADVISORY",
-      gradient: "from-emerald",
       emoji: "🌱",
     },
     {
@@ -266,7 +349,6 @@ function Dashboard() {
       desc: "Take a leaf photo for instant diagnosis & spray guidance",
       icon: ShieldAlertIcon,
       tag: "AI VISION",
-      gradient: "from-rose",
       emoji: "📸",
     },
     {
@@ -275,17 +357,7 @@ function Dashboard() {
       desc: "Live mandi prices, daily trends & inter-market comparison",
       icon: TrendingUpIcon,
       tag: "LIVE MANDI",
-      gradient: "from-green",
       emoji: "📈",
-    },
-    {
-      to: "/price-alerts",
-      title: "Target Price Alerts",
-      desc: "Automatic push & email alerts when crops reach target rates",
-      icon: BellRingIcon,
-      tag: "PUSH ALERTS",
-      gradient: "from-amber",
-      emoji: "🔔",
     },
     {
       to: "/weather",
@@ -293,7 +365,6 @@ function Dashboard() {
       desc: "7-day rain prediction, humidity and optimal spray calendar",
       icon: CloudSunIcon,
       tag: "AGRO-MET",
-      gradient: "from-cyan",
       emoji: "🌤️",
     },
     {
@@ -302,14 +373,21 @@ function Dashboard() {
       desc: "Find financial subsidies, machinery grants & crop insurance",
       icon: LandmarkIcon,
       tag: "SUBSIDIES",
-      gradient: "from-violet",
       emoji: "🏛️",
+    },
+    {
+      to: "/price-alerts",
+      title: "Price Alert Settings",
+      desc: "Manage email & SMS notifications for all your commodities",
+      icon: BellRingIcon,
+      tag: "PUSH ALERTS",
+      emoji: "🔔",
     },
   ];
 
   return (
     <div className="dashboard-container animate-fade-in">
-      {/* 🔴 Ticker Bar: Live Mandi Rates */}
+      {/* 🔴 Ticker Bar: Live Mandi Rates (Only Crops) */}
       {tickerItems.length > 0 && (
         <div className="live-mandi-ticker-bar">
           <div className="ticker-badge">
@@ -319,6 +397,7 @@ function Dashboard() {
             <div className="ticker-content">
               {tickerItems.map((item, i) => (
                 <div key={i} className="ticker-item">
+                  <span className="ticker-crop-emoji">{getCropEmoji(item.name)}</span>
                   <span className="ticker-crop">{item.name}</span>
                   <span className="ticker-market">({item.market})</span>
                   <span className="ticker-price">₹{item.price.toLocaleString()}/qtl</span>
@@ -350,29 +429,28 @@ function Dashboard() {
           </h1>
 
           <p className="hero-description">
-            Your real-time agricultural companion for APMC Mandi rates, instant target price push
-            notifications, and AI-powered crop & disease advisory.
+            Real-time APMC Mandi rates, AI crop & seed advisory, and automated price push
+            notifications across India.
           </p>
 
           <div className="hero-cta-row">
-            <Link to="/price-list" className="btn-hero-primary">
+            <a href="#mandi-prices-section" className="btn-hero-primary">
               <TrendingUpIcon size={18} />
-              Explore Mandi Prices
+              Browse All Crop Prices
               <ArrowUpRight size={16} />
-            </Link>
+            </a>
 
             <button
               type="button"
               onClick={handleSpeakBestMarket}
               className={`btn-hero-voice ${isSpeaking ? "speaking" : ""}`}
-              disabled={!data.length}
+              disabled={!agriculturalData.length}
             >
               <Volume2Icon size={18} />
               <span>{isSpeaking ? "Broadcasting..." : t.bestMarketButton || "Hear Today's Best Rate"}</span>
               {isSpeaking && <span className="audio-wave-anim" />}
             </button>
 
-            {/* PWA App Install Button */}
             {!isInstalled && (
               <button
                 type="button"
@@ -403,7 +481,7 @@ function Dashboard() {
             </div>
             <div className="pulse-item">
               <strong>{loading ? "..." : totalCrops}</strong>
-              <span>Commodities</span>
+              <span>Crop Varieties</span>
             </div>
             <div className="pulse-item highlight">
               <strong>{loading ? "..." : `₹${avgPrice.toLocaleString()}`}</strong>
@@ -415,123 +493,427 @@ function Dashboard() {
             <div className="hero-top-crop-pill">
               <span className="pill-star">⭐</span>
               <span className="pill-text">
-                Top Rate: <strong>{bestCropItem.Commodity || bestCropItem.Crop}</strong> at{" "}
+                Top Crop: <strong>{getCropEmoji(bestCropItem.Commodity || bestCropItem.Crop)} {bestCropItem.Commodity || bestCropItem.Crop}</strong> at{" "}
                 <strong>₹{Number(bestCropItem.Modal_x0020_Price).toLocaleString()}</strong> in{" "}
-                {bestCropItem.Market}
+                {bestCropItem.Market} ({bestCropItem.State})
               </span>
             </div>
           )}
         </div>
       </section>
 
-      {/* 🔔 TARGET PRICE PUSH NOTIFICATION SECTION */}
+      {/* 🔔 PRICE ALERT SECTION (ONLY SHOWN OR PROMPTED FOR FARMER LOGIN) */}
       <section className="target-alert-card kisan-card">
-        <div className="target-alert-header">
-          <div className="target-alert-title-wrap">
-            <div className="target-alert-bell-icon">
-              <BellRingIcon size={24} />
-              {activeAlerts.length > 0 && <span className="target-alert-count">{activeAlerts.length}</span>}
+        {user ? (
+          // Logged-in view: Full Target Price Alert Manager
+          <>
+            <div className="target-alert-header">
+              <div className="target-alert-title-wrap">
+                <div className="target-alert-bell-icon">
+                  <BellRingIcon size={24} />
+                  {activeAlerts.length > 0 && (
+                    <span className="target-alert-count">{activeAlerts.length}</span>
+                  )}
+                </div>
+                <div>
+                  <h3>Target Price Push Notifications</h3>
+                  <p>
+                    Set your target crop rate. We'll send an instant push notification the moment the
+                    mandi price hits your target!
+                  </p>
+                </div>
+              </div>
+
+              <div className="push-permission-actions">
+                {pushStatus === "granted" ? (
+                  <span className="push-status-badge active">
+                    <CheckCircle2Icon size={15} /> Push Alerts Active
+                  </span>
+                ) : (
+                  <button onClick={handleEnablePush} className="btn-enable-push">
+                    🔔 Enable Push Notifications
+                  </button>
+                )}
+                <button
+                  onClick={sendTestNotification}
+                  className="btn-test-push"
+                  title="Test browser push notification"
+                >
+                  🧪 Test Push Alert
+                </button>
+              </div>
             </div>
-            <div>
-              <h3>Target Price Push Notifications</h3>
-              <p>Set your target crop rate. We'll send an instant push notification the moment the mandi price hits your target!</p>
+
+            {/* Feedback message */}
+            {alertSuccessMsg && (
+              <div className="alert-feedback-banner">✅ {alertSuccessMsg}</div>
+            )}
+
+            {/* Triggered banner */}
+            {triggeredAlerts.length > 0 && (
+              <div className="triggered-alert-banner">
+                <span className="bell-ping">🚨</span>
+                <div>
+                  <strong>Target Price Reached!</strong>
+                  {triggeredAlerts.map((t, i) => (
+                    <div key={i}>
+                      • {t.alert.crop} reached <strong>₹{t.price.toLocaleString()}</strong> (Target: ₹
+                      {t.alert.targetPrice.toLocaleString()}) in {t.match.Market}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Set Target Alert Form */}
+            <form onSubmit={handleCreateAlert} className="target-alert-form">
+              <div className="target-input-field">
+                <label>Crop / Commodity</label>
+                <select
+                  value={alertCrop}
+                  onChange={(e) => setAlertCrop(e.target.value)}
+                  required
+                >
+                  <option value="">— Select Crop to Track —</option>
+                  {uniqueCropNames.map((crop) => (
+                    <option key={crop} value={crop}>
+                      {getCropEmoji(crop)} {crop}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="target-input-field">
+                <label>Target Price (₹ per Quintal)</label>
+                <input
+                  type="number"
+                  min="1"
+                  step="10"
+                  placeholder="e.g. 2500"
+                  value={alertTargetPrice}
+                  onChange={(e) => setAlertTargetPrice(e.target.value)}
+                  required
+                />
+              </div>
+
+              <button type="submit" className="btn-save-target-alert">
+                <BellRingIcon size={16} />
+                Set Target Alert
+              </button>
+            </form>
+
+            {/* Active Alerts List */}
+            {activeAlerts.length > 0 && (
+              <div className="active-alerts-drawer">
+                <span className="drawer-heading">Your Active Target Price Watchers:</span>
+                <div className="active-alerts-chips">
+                  {activeAlerts.map((a) => (
+                    <div key={a.id} className="target-chip">
+                      <span className="chip-crop">{getCropEmoji(a.crop)} {a.crop}</span>
+                      <span className="chip-price">
+                        Target: ₹{Number(a.targetPrice).toLocaleString()}/qtl
+                      </span>
+                      <button
+                        onClick={() => handleDeleteAlert(a.id)}
+                        className="chip-remove"
+                        title="Remove alert"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          // Non-logged-in view: Clean, attractive sign-in prompt
+          <div className="price-alert-login-banner">
+            <div className="login-banner-left">
+              <div className="login-banner-icon">🔔</div>
+              <div>
+                <h3>Personalized Price Alerts & Push Notifications</h3>
+                <p>
+                  Sign in as a Farmer to track your crops and receive automated push & SMS alerts the
+                  moment mandi rates reach your target price!
+                </p>
+              </div>
             </div>
+            <Link to="/login" className="btn-login-alert-cta">
+              <UserIcon size={18} />
+              Sign In to Set Price Alerts
+            </Link>
+          </div>
+        )}
+      </section>
+
+      {/* 🌾 ALL CROP PRICES EXPLORER WITH BETTER DESIGN */}
+      <section id="mandi-prices-section" className="mandi-explorer-section">
+        <div className="mandi-explorer-header">
+          <div>
+            <div className="section-super-title">🔴 LIVE APMC MARKET INTELLIGENCE</div>
+            <h2>All Crop Mandi Rates</h2>
+            <p>Compare real-time modal, min & max rates across mandis in India</p>
           </div>
 
-          <div className="push-permission-actions">
-            {pushStatus === "granted" ? (
-              <span className="push-status-badge active">
-                <CheckCircle2Icon size={15} /> Push Alerts Active
-              </span>
-            ) : (
-              <button onClick={handleEnablePush} className="btn-enable-push">
-                🔔 Enable Browser Notifications
-              </button>
-            )}
-            <button onClick={sendTestNotification} className="btn-test-push" title="Test browser push notification">
-              🧪 Test Push Alert
+          {/* View mode toggle */}
+          <div className="view-mode-toggle">
+            <button
+              className={`view-btn ${viewMode === "grid" ? "active" : ""}`}
+              onClick={() => setViewMode("grid")}
+              title="Grid Card View"
+            >
+              ⊞ Cards
+            </button>
+            <button
+              className={`view-btn ${viewMode === "table" ? "active" : ""}`}
+              onClick={() => setViewMode("table")}
+              title="Table View"
+            >
+              ☰ Table
             </button>
           </div>
         </div>
 
-        {/* Feedback message */}
-        {alertSuccessMsg && (
-          <div className="alert-feedback-banner">
-            ✅ {alertSuccessMsg}
-          </div>
-        )}
-
-        {/* Triggered banner */}
-        {triggeredAlerts.length > 0 && (
-          <div className="triggered-alert-banner">
-            <span className="bell-ping">🚨</span>
-            <div>
-              <strong>Target Price Reached!</strong>
-              {triggeredAlerts.map((t, i) => (
-                <div key={i}>
-                  • {t.alert.crop} reached <strong>₹{t.price.toLocaleString()}</strong> (Target: ₹{t.alert.targetPrice.toLocaleString()}) in {t.match.Market}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Set Target Alert Form */}
-        <form onSubmit={handleCreateAlert} className="target-alert-form">
-          <div className="target-input-field">
-            <label>Crop / Commodity</label>
-            <select
-              value={alertCrop}
-              onChange={(e) => setAlertCrop(e.target.value)}
-              required
-            >
-              <option value="">— Select Crop to Track —</option>
-              {uniqueCropNames.map((crop) => (
-                <option key={crop} value={crop}>
-                  {crop}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="target-input-field">
-            <label>Target Price (₹ per Quintal)</label>
+        {/* Filter & Search Bar */}
+        <div className="mandi-filter-bar">
+          <div className="mandi-search-input-wrap">
+            <SearchIcon size={18} />
             <input
-              type="number"
-              min="1"
-              step="10"
-              placeholder="e.g. 2500"
-              value={alertTargetPrice}
-              onChange={(e) => setAlertTargetPrice(e.target.value)}
-              required
+              type="text"
+              placeholder="Search crop, variety, or mandi (e.g. Tomato, Wheat, Pune)..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery("")} className="clear-search-btn">
+                ✕
+              </button>
+            )}
           </div>
 
-          <button type="submit" className="btn-save-target-alert">
-            <BellRingIcon size={16} />
-            Set Target Alert
-          </button>
-        </form>
-
-        {/* Active Alerts List */}
-        {activeAlerts.length > 0 && (
-          <div className="active-alerts-drawer">
-            <span className="drawer-heading">Your Active Target Price Watchers:</span>
-            <div className="active-alerts-chips">
-              {activeAlerts.map((a) => (
-                <div key={a.id} className="target-chip">
-                  <span className="chip-crop">{a.crop}</span>
-                  <span className="chip-price">Target: ₹{Number(a.targetPrice).toLocaleString()}/qtl</span>
-                  <button
-                    onClick={() => handleDeleteAlert(a.id)}
-                    className="chip-remove"
-                    title="Remove alert"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
+          <div className="mandi-selects-row">
+            <div className="filter-select-group">
+              <label>State:</label>
+              <select value={selectedState} onChange={(e) => setSelectedState(e.target.value)}>
+                <option value="All">All States</option>
+                {allStates.map((st) => (
+                  <option key={st} value={st}>
+                    {st}
+                  </option>
+                ))}
+              </select>
             </div>
+
+            <div className="filter-select-group">
+              <label>Sort By:</label>
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+                <option value="price_high">Highest Rate (High → Low)</option>
+                <option value="price_low">Lowest Rate (Low → High)</option>
+                <option value="name_asc">Crop Name (A → Z)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Category Pills */}
+        <div className="category-pills-row">
+          {categories.map((cat) => (
+            <button
+              key={cat.value}
+              className={`category-pill ${selectedCategory === cat.value ? "active" : ""}`}
+              onClick={() => setSelectedCategory(cat.value)}
+            >
+              <span>{cat.emoji}</span>
+              <span>{cat.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Results Counter */}
+        <div className="results-counter-row">
+          <span>
+            Showing <strong>{displayedCrops.length}</strong> of <strong>{filteredCrops.length}</strong> crops reporting today
+          </span>
+          {selectedCategory !== "All" && (
+            <button
+              className="btn-reset-filters"
+              onClick={() => {
+                setSelectedCategory("All");
+                setSelectedState("All");
+                setSearchQuery("");
+              }}
+            >
+              Reset Filters
+            </button>
+          )}
+        </div>
+
+        {/* Crops Display: Grid View */}
+        {viewMode === "grid" ? (
+          <div className="crop-cards-grid">
+            {displayedCrops.map((item, idx) => {
+              const cropName = item.Commodity || item.Crop || "Crop";
+              const modalPrice = Number(item.Modal_x0020_Price || 0);
+              const minPrice = Number(item.Min_x0020_Price || 0);
+              const maxPrice = Number(item.Max_x0020_Price || 0);
+              const category = getCropCategory(cropName);
+
+              return (
+                <div key={idx} className="crop-price-card">
+                  <div className="crop-card-top-meta">
+                    <div className="crop-emoji-box">{getCropEmoji(cropName)}</div>
+                    <span className="crop-category-badge">{category}</span>
+                  </div>
+
+                  <div className="crop-card-main-info">
+                    <h3 className="crop-name">{cropName}</h3>
+                    {item.Variety && item.Variety !== "Other" && (
+                      <span className="crop-variety">Variety: {item.Variety}</span>
+                    )}
+
+                    <div className="crop-location">
+                      <MapPinIcon size={14} />
+                      <span>{item.Market || "Central Mandi"}, {item.State}</span>
+                    </div>
+                  </div>
+
+                  {/* Price Block */}
+                  <div className="crop-price-block">
+                    <div className="modal-rate-label">Modal Price</div>
+                    <div className="modal-rate-val">
+                      ₹{modalPrice.toLocaleString()} <span className="rate-unit">/ quintal</span>
+                    </div>
+
+                    {minPrice > 0 && maxPrice > 0 && (
+                      <div className="price-range-row">
+                        <span>Min: ₹{minPrice.toLocaleString()}</span>
+                        <span>•</span>
+                        <span>Max: ₹{maxPrice.toLocaleString()}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Card Action Buttons */}
+                  <div className="crop-card-actions">
+                    <button
+                      className="btn-card-listen"
+                      onClick={() =>
+                        speakBestMarket({
+                          crop: cropName,
+                          market: item.Market,
+                          state: item.State,
+                          price: modalPrice,
+                          greeting: "Market price for",
+                        })
+                      }
+                      title="Listen to price in audio"
+                    >
+                      <Volume2Icon size={15} /> Listen
+                    </button>
+
+                    <button
+                      className="btn-card-alert"
+                      onClick={() => {
+                        if (!user) {
+                          navigate("/login");
+                        } else {
+                          setAlertCrop(cropName);
+                          setAlertTargetPrice(modalPrice ? modalPrice + 200 : "");
+                          window.scrollTo({ top: 300, behavior: "smooth" });
+                        }
+                      }}
+                      title="Set target price alert"
+                    >
+                      <BellRingIcon size={15} /> Set Alert
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          // Table View
+          <div className="table-responsive-kisan crop-table-wrap">
+            <table className="table-kisan">
+              <thead>
+                <tr>
+                  <th>Commodity</th>
+                  <th>Variety</th>
+                  <th>Mandi Market</th>
+                  <th>State</th>
+                  <th>Modal Price</th>
+                  <th>Range (Min - Max)</th>
+                  <th style={{ textAlign: "right" }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayedCrops.map((item, idx) => {
+                  const cropName = item.Commodity || item.Crop || "Crop";
+                  const modalPrice = Number(item.Modal_x0020_Price || 0);
+                  const minPrice = Number(item.Min_x0020_Price || 0);
+                  const maxPrice = Number(item.Max_x0020_Price || 0);
+
+                  return (
+                    <tr key={idx}>
+                      <td>
+                        <strong className="crop-table-name">
+                          <span>{getCropEmoji(cropName)}</span> {cropName}
+                        </strong>
+                      </td>
+                      <td>{item.Variety || "Standard"}</td>
+                      <td>
+                        <span className="table-market-cell">
+                          <MapPinIcon size={14} color="#64748b" /> {item.Market || "Mandi"}
+                        </span>
+                      </td>
+                      <td>{item.State}</td>
+                      <td>
+                        <span className="table-modal-price">₹{modalPrice.toLocaleString()} / qtl</span>
+                      </td>
+                      <td>
+                        {minPrice > 0 ? `₹${minPrice.toLocaleString()} - ₹${maxPrice.toLocaleString()}` : "—"}
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <button
+                          className="btn-table-listen"
+                          onClick={() =>
+                            speakBestMarket({
+                              crop: cropName,
+                              market: item.Market,
+                              state: item.State,
+                              price: modalPrice,
+                              greeting: "Market price for",
+                            })
+                          }
+                          title="Listen to price"
+                        >
+                          <Volume2Icon size={14} /> Listen
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Load More Button */}
+        {displayedCrops.length < filteredCrops.length && (
+          <div className="load-more-row">
+            <button
+              className="btn-load-more"
+              onClick={() => setDisplayCount((prev) => prev + 24)}
+            >
+              Load More Crops (+24)
+            </button>
+            <button
+              className="btn-show-all"
+              onClick={() => setDisplayCount(filteredCrops.length)}
+            >
+              Show All ({filteredCrops.length} Crops)
+            </button>
           </div>
         )}
       </section>
@@ -547,7 +929,6 @@ function Dashboard() {
 
         <div className="quick-tools-grid">
           {quickTools.map((tool, idx) => {
-            const Icon = tool.icon;
             return (
               <Link to={tool.to} key={idx} className="quick-tool-card">
                 <div className="tool-card-top">
@@ -566,77 +947,9 @@ function Dashboard() {
         </div>
       </section>
 
-      {/* 📈 Market Overview Cards */}
-      <section>
-        <div className="dash-section-header">
-          <div>
-            <h2>Market Intelligence</h2>
-            <p>Real-time statistics across active mandis in India</p>
-          </div>
-        </div>
-
-        <div className="dashboard-stats-grid">
-          <div className="stat-card kisan-card">
-            <div className="stat-icon-wrap emerald">
-              <TrendingUpIcon size={24} />
-            </div>
-            <div className="stat-content">
-              <span className="stat-label">Mandis Reporting</span>
-              <h3 className="stat-value">{loading ? "—" : totalMandis}</h3>
-              <span className="stat-subtext">APMC markets live in feed</span>
-            </div>
-          </div>
-
-          <div className="stat-card kisan-card">
-            <div className="stat-icon-wrap gold">
-              <SparklesIcon size={24} />
-            </div>
-            <div className="stat-content">
-              <span className="stat-label">Top Commodity Rate</span>
-              <h3 className="stat-value">
-                {bestCropItem
-                  ? `₹${Number(bestCropItem.Modal_x0020_Price).toLocaleString()}`
-                  : loading
-                  ? "—"
-                  : "No data"}
-              </h3>
-              <span className="stat-subtext">
-                {bestCropItem
-                  ? `${bestCropItem.Commodity || bestCropItem.Crop} (${bestCropItem.Market})`
-                  : "Waiting for prices"}
-              </span>
-            </div>
-          </div>
-
-          <div className="stat-card kisan-card">
-            <div className="stat-icon-wrap blue">
-              <SproutIcon size={24} />
-            </div>
-            <div className="stat-content">
-              <span className="stat-label">Average Market Rate</span>
-              <h3 className="stat-value">
-                {loading ? "—" : avgPrice ? `₹${avgPrice.toLocaleString()}` : "—"}
-              </h3>
-              <span className="stat-subtext">Per quintal average across all crops</span>
-            </div>
-          </div>
-
-          <Link to="/price-alerts" className="stat-card kisan-card interactive">
-            <div className="stat-icon-wrap amber">
-              <BellRingIcon size={24} />
-            </div>
-            <div className="stat-content">
-              <span className="stat-label">Price Watchers</span>
-              <h3 className="stat-value">{activeAlerts.length} Active</h3>
-              <span className="stat-subtext">Click to manage your push alerts →</span>
-            </div>
-          </Link>
-        </div>
-      </section>
-
-      {/* 🌾 Top Performing Crops Section */}
+      {/* 🌾 Top 5 Highest Priced Crops Section (Excluding Livestock) */}
       <section className="dashboard-section-panel">
-        <TopBestCrops data={data} loading={loading} />
+        <TopBestCrops data={agriculturalData} loading={loading} />
       </section>
     </div>
   );

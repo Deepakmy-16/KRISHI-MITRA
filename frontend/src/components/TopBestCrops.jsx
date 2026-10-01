@@ -1,14 +1,17 @@
 import React from "react";
 import { SparklesIcon, Volume2Icon, MapPinIcon } from "./Icons";
 import { speakBestMarket } from "../utils/speakPrice";
+import { isAgriculturalCrop, getCropEmoji } from "../utils/cropHelpers";
 
 function TopBestCrops({ data = [] }) {
   if (!data.length) return null;
 
-  // Group by crop and find best market per crop
+  // Group by crop and find best market per crop (excluding non-crops like pigs)
   const cropBestMap = {};
 
   data.forEach((item) => {
+    if (!isAgriculturalCrop(item)) return;
+
     const crop =
       item.Commodity ||
       item.commodity ||
@@ -64,8 +67,9 @@ function TopBestCrops({ data = [] }) {
                   <span style={{ fontSize: "1.3rem" }}>{medals[i]}</span>
                 </td>
                 <td>
-                  <strong style={{ fontSize: "1rem", color: "var(--text-main)" }}>
-                    {item.crop}
+                  <strong style={{ fontSize: "1rem", color: "var(--text-main)", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+                    <span>{getCropEmoji(item.crop)}</span>
+                    <span>{item.crop}</span>
                   </strong>
                 </td>
                 <td>
