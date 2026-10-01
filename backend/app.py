@@ -32,14 +32,29 @@ from routes.history_routes import history_bp
 
 app = Flask(__name__)
 # Enable CORS for all routes and origins
-CORS(app, resources={r"/api/*": {"origins": "*", "allow_headers": ["Content-Type", "X-User-Id"], "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]}})
+# IMPORTANT: Replace YOUR_VERCEL_APP with your actual Vercel deployment URL
+ALLOWED_ORIGINS = [
+    "*",  # Allow all (safe for public data APIs; restrict if you need auth security)
+    # Add your Vercel URL here for stricter security, e.g.:
+    # "https://krishi-mitra.vercel.app",
+    # "https://your-custom-domain.com",
+]
+CORS(app, resources={r"/api/*": {"origins": ALLOWED_ORIGINS, "allow_headers": ["Content-Type", "X-User-Id"], "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]}})
 app.register_blueprint(plant_disease_bp)
 app.register_blueprint(recommendation_bp)
 app.register_blueprint(history_bp)
 
 DATA = []
 
+def ensure_data_dir():
+    """Create the data directory if it doesn't exist (needed on fresh deployments)."""
+    data_dir = os.path.join(BASE_DIR, "data")
+    os.makedirs(data_dir, exist_ok=True)
+
+ensure_data_dir()
+
 def load_data():
+
     global DATA
     DATA = []
     
