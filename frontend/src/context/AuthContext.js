@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useMemo, useEffect } from "react";
 import { ClerkProvider, useUser, useClerk } from "@clerk/clerk-react";
+import API_BASE_URL from "../config";
 
 const AuthContext = createContext();
 
@@ -29,7 +30,6 @@ function ClerkBridge({ children }) {
   // ── Track login in admin panel ──────────────────────────────────────────
   useEffect(() => {
     if (!isLoaded || !clerkUser) return;
-    const API_BASE_URL = process.env.REACT_APP_API_URL || "https://krishi-mitra-6avb.onrender.com";
     fetch(`${API_BASE_URL}/api/admin/track-login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
