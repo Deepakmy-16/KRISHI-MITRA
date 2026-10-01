@@ -109,6 +109,12 @@ function Sidebar({ isOpen, onClose }) {
       to: "/settings",
       label: t.settings || "Settings",
       icon: SettingsIcon
+    },
+    {
+      to: "/login?role=admin",
+      label: "Admin Login",
+      icon: ShieldAlertIcon,
+      badge: "ADMIN"
     }
   ];
 
@@ -197,10 +203,28 @@ function Sidebar({ isOpen, onClose }) {
               </button>
             </div>
           ) : (
-            <NavLink to="/login" className="btn-sidebar-login" onClick={onClose}>
-              <UserIcon size={18} />
-              <span>{t.login || "Farmer Login"}</span>
-            </NavLink>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", width: "100%" }}>
+              <NavLink to="/login" className="btn-sidebar-login" onClick={onClose}>
+                <UserIcon size={18} />
+                <span>{t.login || "Farmer Login"}</span>
+              </NavLink>
+              <NavLink
+                to="/login?role=admin"
+                className="btn-sidebar-login"
+                onClick={onClose}
+                style={{
+                  background: "rgba(22, 163, 74, 0.08)",
+                  border: "1px dashed rgba(22, 163, 74, 0.4)",
+                  color: "#166534",
+                  fontSize: "0.85rem",
+                  padding: "0.55rem 0.85rem",
+                  justifyContent: "center",
+                  fontWeight: "600"
+                }}
+              >
+                <span>🔐 Admin Login</span>
+              </NavLink>
+            </div>
           )}
         </div>
       </aside>

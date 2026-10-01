@@ -9,20 +9,61 @@
 .login-container-card {
   max-width: 480px;
   width: 100%;
-  padding: 2.5rem 2rem;
+  padding: 2rem;
+  background: var(--bg-card, #ffffff);
+  border-radius: var(--radius-xl, 16px);
+  border: 1px solid var(--border-color, #e2e8f0);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+}
+
+/* Tabs switcher */
+.login-role-tabs {
+  display: flex;
+  background: var(--bg-main, #f1f5f9);
+  padding: 4px;
+  border-radius: 12px;
+  margin-bottom: 1.75rem;
+  gap: 4px;
+}
+
+.login-role-tab {
+  flex: 1;
+  padding: 0.65rem 0.75rem;
+  border: none;
+  background: transparent;
+  color: var(--text-muted, #64748b);
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.login-role-tab:hover {
+  color: var(--text-main, #0f172a);
+}
+
+.login-role-tab.active {
+  background: #ffffff;
+  color: #166534;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .login-header-section {
   text-align: center;
-  margin-bottom: 2rem;
+  margin-bottom: 1.75rem;
 }
 
 .login-logo-box {
   width: 56px;
   height: 56px;
-  border-radius: var(--radius-lg);
-  background: var(--primary-soft);
-  border: 1.5px solid var(--primary-border);
+  border-radius: var(--radius-lg, 12px);
+  background: var(--primary-soft, #f0fdf4);
+  border: 1.5px solid var(--primary-border, #bbf7d0);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -30,23 +71,131 @@
   margin: 0 auto 1rem auto;
 }
 
+.login-logo-box.admin-box {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
 .login-header-section h2 {
-  font-size: 1.5rem;
+  font-size: 1.45rem;
   font-weight: 800;
-  color: var(--text-main);
-  margin-bottom: 0.4rem;
+  color: var(--text-main, #0f172a);
+  margin-bottom: 0.35rem;
 }
 
 .login-header-section p {
   font-size: 0.875rem;
-  color: var(--text-muted);
+  color: var(--text-muted, #64748b);
   line-height: 1.45;
 }
 
-.login-farmer-form {
+/* Admin inline form */
+.admin-inline-form {
   display: flex;
   flex-direction: column;
-  gap: 1.15rem;
+  gap: 1.1rem;
+}
+
+.admin-inline-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  text-align: left;
+}
+
+.admin-inline-group label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-main, #1e293b);
+}
+
+.admin-inline-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  background: var(--bg-main, #f8fafc);
+  border: 1.5px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+  padding: 0.65rem 0.85rem;
+  transition: border-color 0.2s ease;
+}
+
+.admin-inline-input-wrap:focus-within {
+  border-color: #16a34a;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
+}
+
+.admin-inline-input-wrap input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.95rem;
+  color: #0f172a;
+  width: 100%;
+}
+
+.btn-admin-submit {
+  width: 100%;
+  padding: 0.8rem;
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 0.5rem;
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.25);
+}
+
+.btn-admin-submit:hover:not(:disabled) {
+  background: linear-gradient(135deg, #15803d, #166534);
+  transform: translateY(-1px);
+}
+
+.btn-admin-submit:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.admin-inline-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  padding: 0.75rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.login-switch-footer {
+  text-align: center;
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-color, #e2e8f0);
+  font-size: 0.85rem;
+  color: var(--text-muted, #64748b);
+}
+
+.btn-switch-role {
+  background: none;
+  border: none;
+  color: #16a34a;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+  font-size: inherit;
+}
+
+.btn-switch-role:hover {
+  color: #15803d;
 }
 
 .clerk-signin-wrapper {

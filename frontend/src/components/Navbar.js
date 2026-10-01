@@ -80,9 +80,14 @@ function Navbar() {
 
         {/* LOGIN / ACCOUNT */}
         {!user ? (
-          <Link to="/login" className="nav-link login-btn">
-            🔐 {t.login}
-          </Link>
+          <>
+            <Link to="/login" className="nav-link login-btn">
+              🔐 {t.login}
+            </Link>
+            <Link to="/login?role=admin" className="nav-link" style={{ fontSize: "0.85rem" }}>
+              Admin
+            </Link>
+          </>
         ) : (
           <>
             <Link to="/account" className="nav-link">
