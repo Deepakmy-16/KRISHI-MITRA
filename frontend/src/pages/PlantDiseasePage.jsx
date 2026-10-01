@@ -125,7 +125,8 @@ function PlantDiseasePage() {
         fetchHistory();
       }
     } catch (err) {
-      setError("Cannot reach backend server. Please verify that the Krishi Mitra backend is running on port 5000.");
+      console.error("Plant Disease Prediction network error:", err);
+      setError(`Cannot reach backend server at ${API_BASE}. Please verify that the Krishi Mitra backend is running.`);
     } finally {
       setLoading(false);
     }
