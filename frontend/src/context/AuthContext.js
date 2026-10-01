@@ -26,6 +26,25 @@ function ClerkBridge({ children }) {
     };
   }, [clerkUser]);
 
+  // ── Track login in admin panel ──────────────────────────────────────────
+  useEffect(() => {
+    if (!isLoaded || !clerkUser) return;
+    const API_BASE_URL = process.env.REACT_APP_API_URL || "https://krishi-mitra-6avb.onrender.com";
+    fetch(`${API_BASE_URL}/api/admin/track-login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: clerkUser.id,
+        name:    clerkUser.fullName || clerkUser.firstName || clerkUser.username || "",
+        email:   clerkUser.primaryEmailAddress?.emailAddress || "",
+        phone:   clerkUser.primaryPhoneNumber?.phoneNumber || "",
+        photo:   clerkUser.imageUrl || "",
+        event:   "login",
+        page:    window.location.pathname,
+      }),
+    }).catch(() => {}); // silent — never break the app
+  }, [isLoaded, clerkUser?.id]); // eslint-disable-line
+
   const logout = async () => {
     try {
       await clerk.signOut();
@@ -51,6 +70,7 @@ function ClerkBridge({ children }) {
     </AuthContext.Provider>
   );
 }
+
 
 export function AuthProvider({ children }) {
   if (!CLERK_KEY) {

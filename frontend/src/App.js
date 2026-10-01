@@ -23,6 +23,8 @@ import AccountPage from "./pages/AccountPage";
 import SettingsPage from "./pages/SettingsPage";
 import LoginPage from "./pages/LoginPage";
 import FarmerHistoryPage from "./pages/FarmerHistoryPage";
+import AdminLoginPage from "./pages/AdminLoginPage";
+import AdminDashboard from "./pages/AdminDashboard";
 
 function RequireAuth({ children }) {
   const { user, isLoaded } = useAuth();
@@ -127,7 +129,14 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppLayout />
+        <Routes>
+          {/* ── Admin Panel (no sidebar/header) ── */}
+          <Route path="/admin" element={<AdminLoginPage />} />
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+
+          {/* ── Main App ── */}
+          <Route path="/*" element={<AppLayout />} />
+        </Routes>
       </AuthProvider>
     </BrowserRouter>
   );

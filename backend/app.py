@@ -29,6 +29,8 @@ load_dotenv(dotenv_path=dotenv_path)
 from routes.plant_disease_routes import plant_disease_bp
 from routes.recommendation_routes import recommendation_bp
 from routes.history_routes import history_bp
+from routes.admin_routes import admin_bp
+import admin_service
 
 app = Flask(__name__)
 # Enable CORS for all routes and origins
@@ -43,6 +45,7 @@ CORS(app, resources={r"/api/*": {"origins": ALLOWED_ORIGINS, "allow_headers": ["
 app.register_blueprint(plant_disease_bp)
 app.register_blueprint(recommendation_bp)
 app.register_blueprint(history_bp)
+app.register_blueprint(admin_bp)
 
 DATA = []
 
