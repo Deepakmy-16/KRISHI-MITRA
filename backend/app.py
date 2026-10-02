@@ -92,9 +92,12 @@ scheduler.start()
 
 def initial_sync():
     try:
-        scrape_schemes()
-        fetch_realtime_prices()
         load_data()
+        # Only run network scraping if live data file is missing
+        live_path = os.path.join(BASE_DIR, "data", "live_crops.json")
+        if not os.path.exists(live_path):
+            fetch_realtime_prices()
+            load_data()
         run_price_alert_checks()
     except Exception as e:
         print(f"Initial setup/scraping notice: {e}")
