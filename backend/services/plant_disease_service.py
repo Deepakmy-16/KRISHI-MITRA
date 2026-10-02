@@ -83,7 +83,12 @@ def parse_class_label(raw_label: str):
     return format_name(raw_label), "Unknown"
 
 def _try_predict_pytorch(image):
-    """Attempt prediction using local PyTorch model if available."""
+    """Attempt prediction using local PyTorch model if available and memory permits."""
+    # Skip heavy PyTorch RAM loading on free cloud hosting (Render 512MB limit) to prevent 502 OOM crashes
+    if os.getenv("RENDER") or os.getenv("DISABLE_PYTORCH"):
+        print("[PlantDiseaseService] Cloud environment detected (Render). Using API/Heuristic analysis to save RAM.")
+        return None
+
     try:
         import torch
         import torchvision.transforms.functional as TF
