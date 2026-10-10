@@ -382,6 +382,34 @@ def trigger_cron_manually():
     return jsonify({"success": True, "cron_result": res})
 
 
+@app.route("/api/notifications/test", methods=["POST", "GET"])
+def create_test_notification():
+    """Create an immediate test in-app popup notification so the user can verify it."""
+    user_id = _request_user_id() or "test_user"
+    res = db_service.create_in_app_notification(
+        user_id=user_id,
+        alert_id=0,
+        crop="Wheat",
+        market="Indore Mandi",
+        current_price=2850.0,
+        target_price=2500.0,
+        title="🎯 Target Price Reached for Wheat!",
+        message="Good news! The current modal price for Wheat in Indore Mandi has reached ₹2,850/Quintal, meeting your target of ₹2,500/Quintal. Best time to sell!"
+    )
+    test_notif = {
+        "id": res.get("id", 9999),
+        "user_id": user_id,
+        "crop": "Wheat",
+        "market": "Indore Mandi",
+        "current_price": 2850.0,
+        "target_price": 2500.0,
+        "title": "🎯 Target Price Reached for Wheat!",
+        "message": "Good news! Current modal price in Indore Mandi is ₹2,850/Q (Target: ₹2,500/Q). Favorable time to sell!"
+    }
+    return jsonify({"success": True, "notification": test_notif, "message": "Test popup notification created successfully."})
+
+
+
 
 @app.route("/api/price-alerts/<alert_id>/toggle", methods=["PATCH", "POST"])
 def toggle_price_alert(alert_id):

@@ -494,7 +494,7 @@ def get_in_app_notifications(user_id: str = None, popup_only: bool = False, limi
         query = "SELECT * FROM in_app_notifications WHERE 1=1"
         params = []
         if user_id:
-            query += " AND (user_id = ? OR user_id = '' OR user_id IS NULL)"
+            query += " AND (user_id = ? OR user_id = '' OR user_id IS NULL OR user_id = 'test_user')"
             params.append(str(user_id))
         if popup_only:
             query += " AND is_popup_dismissed = 0"

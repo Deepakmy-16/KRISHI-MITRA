@@ -22,7 +22,7 @@ function InAppNotificationPopup() {
         osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
         osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15); // A5
         gain.gain.setValueAtTime(0.2, ctx.currentTime);
-        gain.gain.exponentialRampToTime(0.01, ctx.currentTime + 0.4);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start();
@@ -32,6 +32,25 @@ function InAppNotificationPopup() {
       // Audio autoplay policy fallback
     }
   };
+
+  const showPopup = useCallback((notif) => {
+    if (!notif) return;
+    setActivePopup(notif);
+    playChime();
+
+    // Also trigger browser push notification if supported & permitted
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+      try {
+        new Notification(notif.title || "🎯 Target Price Reached!", {
+          body: `${notif.crop}: Current mandi price is ₹${Number(notif.current_price).toLocaleString("en-IN")}/Q in ${notif.market}. Recommended: SELL NOW!`,
+          icon: "/icon-192.png",
+          tag: `krishi-popup-${notif.id || Date.now()}`
+        });
+      } catch (e) {
+        // Fallback
+      }
+    }
+  }, []);
 
   const fetchPendingPopups = useCallback(async () => {
     try {
@@ -52,23 +71,35 @@ function InAppNotificationPopup() {
         // Find the first notification that hasn't been locally dismissed yet
         const unhandled = notifications.find(n => !dismissedIds.has(n.id));
         if (unhandled && (!activePopup || activePopup.id !== unhandled.id)) {
-          setActivePopup(unhandled);
-          playChime();
-        } else if (!unhandled) {
+          showPopup(unhandled);
+        } else if (!unhandled && !activePopup) {
           setActivePopup(null);
         }
       }
     } catch (err) {
       // Quiet background poll failure
     }
-  }, [user, dismissedIds, activePopup]);
+  }, [user, dismissedIds, activePopup, showPopup]);
 
   useEffect(() => {
     fetchPendingPopups();
-    // Poll for cron job alerts every 30 seconds
-    const interval = setInterval(fetchPendingPopups, 30000);
+    // Poll for cron job alerts every 15 seconds
+    const interval = setInterval(fetchPendingPopups, 15000);
     return () => clearInterval(interval);
   }, [fetchPendingPopups]);
+
+  // Listen for instant in-app triggers from other components
+  useEffect(() => {
+    const handleImmediateTrigger = (event) => {
+      if (event.detail) {
+        showPopup(event.detail);
+      } else {
+        fetchPendingPopups();
+      }
+    };
+    window.addEventListener("krishi_trigger_popup", handleImmediateTrigger);
+    return () => window.removeEventListener("krishi_trigger_popup", handleImmediateTrigger);
+  }, [showPopup, fetchPendingPopups]);
 
   const handleDismiss = async () => {
     if (!activePopup) return;
@@ -104,7 +135,7 @@ function InAppNotificationPopup() {
           </div>
           <div className="popup-badge-text">
             <h3>{activePopup.title || "🎯 Target Price Reached!"}</h3>
-            <span className="popup-tag">Cron Job Alert</span>
+            <span className="popup-tag">Price Alert Triggered</span>
           </div>
           <button
             className="popup-close-btn"
@@ -138,7 +169,7 @@ function InAppNotificationPopup() {
           </div>
 
           <p className="popup-recommendation-note">
-            🚀 <strong>Recommendation:</strong> Market prices have met your threshold! It is currently a favorable time to <strong>SELL</strong> this crop.
+            🚀 <strong>Recommendation:</strong> Market prices have reached your target! It is currently a favorable time to <strong>SELL</strong> your crop at this mandi.
           </p>
         </div>
 

@@ -143,7 +143,7 @@ def check_and_trigger_price_alerts(live_data: list):
                 else market
             )
             print(
-                f"[Price Alert] {crop} current ₹{current_price} >= target ₹{target_price}"
+                f"[Price Alert] {crop} current Rs.{current_price} >= target Rs.{target_price}"
             )
 
             sent_ok, details = _dispatch_alert(alert, current_price, market_display)

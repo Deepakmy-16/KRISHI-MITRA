@@ -180,9 +180,21 @@ function PriceAlertPage() {
           message: (result.message || "Price alert created successfully.") + " In-App Popup & Email monitored by Cron Job!"
         });
         setTargetPrice("");
-        fetchAlerts();
         if (liveData.length) {
           evaluateTargetPrices(liveData);
+        }
+        if (result.alert?.immediate_triggered || (selectedLivePrice > 0 && selectedLivePrice >= priceNum)) {
+          window.dispatchEvent(new CustomEvent("krishi_trigger_popup", {
+            detail: {
+              id: result.alert?.id || Date.now(),
+              crop,
+              market: "Local Mandi",
+              current_price: selectedLivePrice || priceNum,
+              target_price: priceNum,
+              title: `🎯 Target Price Reached for ${crop}!`,
+              message: `Current market price is ₹${(selectedLivePrice || priceNum).toLocaleString()}/Q, reaching your target of ₹${priceNum.toLocaleString()}/Q! Recommended: SELL NOW!`
+            }
+          }));
         }
       } else {
         setBanner({ type: "error", message: result.error || "Failed to create price alert." });
@@ -272,6 +284,7 @@ function PriceAlertPage() {
           message: `Cron job check executed! Evaluated alerts against live market prices. (${trig} triggered).`
         });
         fetchAlerts();
+        window.dispatchEvent(new CustomEvent("krishi_trigger_popup"));
       } else {
         setBanner({ type: "error", message: "Cron check evaluation failed." });
       }
@@ -279,6 +292,48 @@ function PriceAlertPage() {
       setBanner({ type: "error", message: "Could not connect to backend Cron Job." });
     } finally {
       setEvaluatingCron(false);
+    }
+  };
+
+  const handleTestPopupNow = async () => {
+    try {
+      if (!isPushEnabled()) {
+        await requestPushPermission();
+      }
+
+      let notifData = {
+        id: Date.now(),
+        crop: crop || "Wheat",
+        market: "Indore Mandi",
+        current_price: selectedLivePrice > 0 ? selectedLivePrice : 2850,
+        target_price: targetPrice ? Number(targetPrice) : 2500,
+        title: `🎯 Target Price Reached for ${crop || "Wheat"}!`,
+        message: `Current market price is ₹${(selectedLivePrice || 2850).toLocaleString()}/Q, meeting your target! Best time to sell.`
+      };
+
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/notifications/test`, {
+          method: "POST",
+          headers: authHeaders()
+        });
+        const json = await res.json();
+        if (json?.notification) {
+          notifData = json.notification;
+        }
+      } catch (e) {
+        // Fallback to local
+      }
+
+      // Fire in-app modal popup
+      window.dispatchEvent(new CustomEvent("krishi_trigger_popup", { detail: notifData }));
+
+      setBanner({
+        type: "success",
+        message: "🎉 Test Notification fired! The In-App Popup Modal has opened on your screen."
+      });
+      fetchAlerts();
+    } catch (err) {
+      setBanner({ type: "error", message: "Failed to fire test popup." });
     }
   };
 
@@ -310,9 +365,13 @@ function PriceAlertPage() {
         </div>
 
         <div className="page-header-actions">
+          <button className="btn-secondary" onClick={handleTestPopupNow}>
+            <BellRingIcon size={16} />
+            <span>Test In-App Alert Now</span>
+          </button>
           <button className="btn-primary" onClick={handleRunCronNow} disabled={evaluatingCron}>
             <RefreshCwIcon size={16} />
-            <span>{evaluatingCron ? "Running Cron Job..." : "Run Cron Check Now"}</span>
+            <span>{evaluatingCron ? "Running Cron..." : "Run Cron Check Now"}</span>
           </button>
         </div>
       </div>
