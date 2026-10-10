@@ -13,7 +13,7 @@ The backend is developed with **Python (Flask)** adhering to a decoupled service
 - **Real-Time Market Intelligence**: Ingestion of live APMC mandi prices from the Government of India's Open Data Portal (`data.gov.in` - Agmarknet).
 - **Deep Learning Disease Diagnosis**: Computer Vision via a Convolutional Neural Network (PyTorch CNN) classifying 38 distinct crop diseases.
 - **Smart Advisory Engines**: Decision heuristics for crop-selling time ("Sell vs. Hold") and state-specific seed variety selection.
-- **Automated Alerting Pipeline**: Background task scheduling (`APScheduler`) integrated with **Twilio (SMS)** and **Resend (Email)** for proactive threshold notifications.
+- **Automated Cron Job Alert Pipeline**: Background Cron Job scheduling (`APScheduler`) generating **In-App Modal Popups** and **Email Alerts (Resend)** for proactive threshold notifications.
 
 ---
 
@@ -23,6 +23,7 @@ The backend is developed with **Python (Flask)** adhering to a decoupled service
 +-------------------------------------------------------------------------+
 |                              PRESENTATION LAYER                         |
 |                 React.js Frontend (SPA) - Responsive UI                 |
+|            - InAppNotificationPopup Modal & TopHeader Badge             |
 +------------------------------------+------------------------------------+
                                      |
                                      | HTTP / JSON Requests (REST)
@@ -31,24 +32,26 @@ The backend is developed with **Python (Flask)** adhering to a decoupled service
 |                              APPLICATION LAYER                          |
 |                       Flask Application (backend/app.py)                |
 |  - Cross-Origin Resource Sharing (CORS)                                 |
+|  - Endpoints: /api/notifications, /api/price-alerts, /api/data          |
 |  - Blueprints: Plant Disease, Recommendation, Farmer History            |
 +-------------------+---------------------------------+-------------------+
                     |                                 |
                     v                                 v
 +-----------------------------------+ +-----------------------------------+
 |          SERVICE ENGINES          | |       BACKGROUND PROCESSOR        |
-| - crop_recommendation_service     | | - APScheduler Engine              |
+| - crop_recommendation_service     | | - Background Cron Job Application |
 | - seed_recommendation_service     | | - alert_checker.py                |
 | - plant_disease_service (PyTorch) | | - 12-Hour Mandi Price Sync        |
-| - email_service & sms_service     | | - 5-Minute Price Alert Evaluation |
+| - email_service (Resend API)      | | - 5-Minute Price Alert Evaluation |
 +-------------------+---------------+ +-----------------+-----------------+
                     |                                   |
                     v                                   v
 +-----------------------------------+ +-----------------------------------+
 |           STORAGE LAYER           | |         EXTERNAL INTEGRATIONS     |
 | - SQLite: users.db & alerts.db    | | - Government Agmarknet API        |
-| - Cached JSON: live_crops.json    | | - Twilio Telephony SMS API        |
-| - Clean Datasets: CSV Files       | | - Resend Transactional Email API  |
+| - in_app_notifications table      | | - Resend Transactional Email API  |
+| - Cached JSON: live_crops.json    | | - myscheme.gov.in Scraper         |
+| - Clean Datasets: CSV Files       |                                     |
 +-----------------------------------+ +-----------------------------------+
 ```
 
@@ -220,7 +223,7 @@ useEffect(() => {
 | **Crop Selling Advisory** | `backend/services/crop_recommendation_service.py` | Heuristic engine comparing modal price against moving averages to suggest "Sell" or "Hold". |
 | **Seed Variety Recommender** | `backend/services/seed_recommendation_service.py` | Geospatial and soil matching using `krishi_mitra_seed_varieties_clean.csv`. |
 | **Government Welfare Schemes** | `backend/schemes_scraper.py` | HTML parser using `BeautifulSoup4` extracting latest benefits from `myscheme.gov.in`. |
-| **SMS Notification System** | `backend/services/sms_service.py` | Twilio REST integration dispatching mobile alerts when crop prices reach a farmer's target. |
+| **Cron Job In-App & Email Alerts** | `backend/alert_checker.py` | Automated background Cron Job checking live mandi rates every 5 mins, triggering In-App Popups & Resend emails. |
 
 ---
 

@@ -56,13 +56,17 @@ def normalize_indian_phone(phone_number: str):
 def _safe_error(exc):
     """Return a user-facing message without credentials or stack traces."""
     code = getattr(exc, "status", None) or getattr(exc, "code", None)
-    if code in (20003, 401, 403):
-        return "SMS service authentication failed. Check backend Twilio settings."
+    exc_str = str(exc).lower()
+    
+    if "authorization with key failed" in exc_str or code in (20003, 401, 403):
+        return "Twilio authentication failed: TWILIO_ACCOUNT_SID in .env must start with 'AC...' (found 'SK...'). Please copy the Account SID from the Twilio Console dashboard."
     if code in (21211, 21614, 21408):
         return "Invalid or unsupported phone number for SMS."
     if code in (21608, 21610):
-        return "This phone number cannot receive SMS from the configured Twilio number."
-    return "Could not send SMS right now. Please try again later."
+        return "Twilio Trial limitation: The target phone number must be added to Verified Caller IDs in your Twilio Console."
+    
+    msg = getattr(exc, "msg", None) or getattr(exc, "message", None)
+    return f"Twilio SMS error: {msg}" if msg else "Could not send SMS right now. Please check backend logs."
 
 
 def send_sms(phone_number: str, body: str):
@@ -73,7 +77,7 @@ def send_sms(phone_number: str, body: str):
     if not is_twilio_configured():
         return {
             "success": False,
-            "error": "SMS is not configured. Add Twilio settings to the backend .env file.",
+            "error": "SMS is not configured. Add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER to .env.",
         }
 
     e164 = normalize_indian_phone(phone_number)
@@ -99,11 +103,11 @@ def send_sms(phone_number: str, body: str):
         )
         return {"success": True, "sid": getattr(message, "sid", None), "to": e164}
     except TwilioRestException as exc:
-        print("[Twilio] SMS send failed.")
+        print(f"[Twilio Error] {exc}")
         return {"success": False, "error": _safe_error(exc)}
-    except Exception:
-        print("[Twilio] Unexpected SMS error.")
-        return {"success": False, "error": "Could not send SMS right now. Please try again later."}
+    except Exception as exc:
+        print(f"[Twilio Unexpected Error] {exc}")
+        return {"success": False, "error": "Could not send SMS right now. Check backend logs."}
 
 
 def send_price_alert(phone_number, crop, current_price, target_price):

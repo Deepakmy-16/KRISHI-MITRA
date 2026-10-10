@@ -1,7 +1,10 @@
 import re
-from db_service import get_active_unsent_alerts, mark_alert_as_sent
+from db_service import (
+    get_active_unsent_alerts,
+    mark_alert_as_sent,
+    create_in_app_notification,
+)
 from email_service import send_price_alert_email
-from services.sms_service import send_price_alert as send_price_alert_sms, normalize_indian_phone
 
 
 def extract_price_value(record):
@@ -56,23 +59,41 @@ def find_crop_price(crop_name: str, market_name: str, live_data: list):
 
 def _dispatch_alert(alert, current_price, market_display):
     """
-    Send SMS (preferred when a phone number exists) and optional email.
-    Returns (channel_success, details). SMS failure must not mark alert_sent.
+    Trigger in-app notification popup and optional email alert.
+    Returns (channel_success, details).
     """
     crop = alert.get("crop")
     target_price = float(alert.get("target_price") or 0)
-    phone = normalize_indian_phone(alert.get("phone_number") or "")
+    user_id = alert.get("user_id") or alert.get("farmer_id")
     email = (alert.get("farmer_email") or "").strip()
-    details = {"sms": None, "email": None}
+    alert_id = alert.get("id")
 
-    sms_ok = False
+    title = f"🎯 Target Price Reached for {crop}!"
+    message = (
+        f"Good news! The modal price for {crop} at {market_display} has reached "
+        f"₹{current_price:,.2f}/Quintal (Target: ₹{target_price:,.2f}/Q). "
+        f"Recommended Action: SELL NOW to maximize profits!"
+    )
+
+    details = {"in_app": None, "email": None}
+
+    # 1. Trigger In-App Notification (pops up directly in web app)
+    in_app_res = create_in_app_notification(
+        user_id=user_id,
+        alert_id=alert_id,
+        crop=crop,
+        market=market_display,
+        current_price=current_price,
+        target_price=target_price,
+        title=title,
+        message=message,
+    )
+    details["in_app"] = "CREATED" if in_app_res.get("success") else "FAILED"
+    in_app_ok = bool(in_app_res.get("success"))
+
+    # 2. Trigger Email Notification via Resend (if email provided)
     email_ok = False
-
-    if phone:
-        sms_res = send_price_alert_sms(phone, crop, current_price, target_price)
-        details["sms"] = "SENT" if sms_res.get("success") else sms_res.get("error")
-        sms_ok = bool(sms_res.get("success"))
-    elif email:
+    if email:
         email_res = send_price_alert_email(
             farmer_email=email,
             crop=crop,
@@ -83,7 +104,7 @@ def _dispatch_alert(alert, current_price, market_display):
         details["email"] = "SENT" if email_res.get("success") else email_res.get("error")
         email_ok = bool(email_res.get("success"))
 
-    return (sms_ok or email_ok), details
+    return (in_app_ok or email_ok), details
 
 
 def check_and_trigger_price_alerts(live_data: list):

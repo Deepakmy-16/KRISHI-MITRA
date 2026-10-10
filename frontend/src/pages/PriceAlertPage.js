@@ -14,6 +14,12 @@ import {
 } from "../components/Icons";
 import "./PriceAlertPage.css";
 import API_BASE_URL from "../config";
+import {
+  requestPushPermission,
+  saveTargetAlert,
+  evaluateTargetPrices,
+  isPushEnabled
+} from "../utils/targetPricePush";
 
 const BACKEND_URL = API_BASE_URL;
 
@@ -24,11 +30,12 @@ const DEFAULT_CROPS = [
 ];
 
 function toE164India(value) {
+  if (!value) return "";
   const digits = String(value || "").replace(/\D/g, "");
   let mobile = digits;
   if (mobile.startsWith("91") && mobile.length === 12) mobile = mobile.slice(2);
   if (mobile.startsWith("0") && mobile.length === 11) mobile = mobile.slice(1);
-  if (!/^[6-9]\d{9}$/.test(mobile)) return null;
+  if (!/^[6-9]\d{9}$/.test(mobile)) return "";
   return `+91${mobile}`;
 }
 
@@ -42,20 +49,19 @@ function PriceAlertPage() {
   const [loadingAlerts, setLoadingAlerts] = useState(false);
 
   const [phone, setPhone] = useState("");
+  const [farmerEmail, setFarmerEmail] = useState("");
   const [crop, setCrop] = useState("");
   const [targetPrice, setTargetPrice] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const [banner, setBanner] = useState(null);
-  const [showTestPanel, setShowTestPanel] = useState(false);
-  const [testPhone, setTestPhone] = useState("");
-  const [sendingTest, setSendingTest] = useState(false);
+  const [evaluatingCron, setEvaluatingCron] = useState(false);
   const [stopTarget, setStopTarget] = useState(null);
   const [stopping, setStopping] = useState(false);
 
   useEffect(() => {
     if (user?.phone && !phone) setPhone(user.phone);
-    if (user?.phone && !testPhone) setTestPhone(user.phone);
+    if (user?.email && !farmerEmail) setFarmerEmail(user.email);
   }, [user]);
 
   const authHeaders = () => ({
@@ -68,7 +74,11 @@ function PriceAlertPage() {
       const res = await fetch(`${BACKEND_URL}/api/data`);
       if (res.ok) {
         const data = await res.json();
-        setLiveData(Array.isArray(data) ? data : []);
+        const validList = Array.isArray(data) ? data : [];
+        setLiveData(validList);
+        if (validList.length) {
+          evaluateTargetPrices(validList);
+        }
       }
     } catch (err) {
       console.warn("Could not load live crops data:", err);
@@ -99,11 +109,8 @@ function PriceAlertPage() {
 
   useEffect(() => {
     fetchLiveData();
-  }, []);
-
-  useEffect(() => {
-    if (isLoaded && user?.id) fetchAlerts();
-  }, [isLoaded, user?.id]);
+    fetchAlerts();
+  }, [user?.id]);
 
   const cropOptions = useMemo(() => {
     const fromLive = new Set();
@@ -137,11 +144,6 @@ function PriceAlertPage() {
       setBanner({ type: "error", message: "Please sign in to set a price alert." });
       return;
     }
-    const e164 = toE164India(phone);
-    if (!e164) {
-      setBanner({ type: "error", message: "Enter a valid Indian mobile number (10 digits starting with 6-9)." });
-      return;
-    }
     if (!crop) {
       setBanner({ type: "error", message: "Please select a crop." });
       return;
@@ -152,13 +154,20 @@ function PriceAlertPage() {
       return;
     }
 
+    // Request browser notification permission if available
+    if (!isPushEnabled()) {
+      await requestPushPermission();
+    }
+    saveTargetAlert(crop, priceNum);
+
     setSubmitting(true);
     try {
       const res = await fetch(`${BACKEND_URL}/api/price-alerts`, {
         method: "POST",
         headers: authHeaders(),
         body: JSON.stringify({
-          phone_number: e164,
+          phone_number: phone ? toE164India(phone) : "",
+          farmer_email: farmerEmail.trim(),
           crop,
           target_price: priceNum,
           user_id: user.id
@@ -166,9 +175,15 @@ function PriceAlertPage() {
       });
       const result = await res.json();
       if (res.ok && result.success) {
-        setBanner({ type: "success", message: result.message || "Price alert created successfully." });
+        setBanner({
+          type: "success",
+          message: (result.message || "Price alert created successfully.") + " In-App Popup & Email monitored by Cron Job!"
+        });
         setTargetPrice("");
         fetchAlerts();
+        if (liveData.length) {
+          evaluateTargetPrices(liveData);
+        }
       } else {
         setBanner({ type: "error", message: result.error || "Failed to create price alert." });
       }
@@ -199,95 +214,71 @@ function PriceAlertPage() {
     }
   };
 
+  const handleResumeAlert = async (id) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/price-alerts/${id}/resume`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ user_id: user.id })
+      });
+      const result = await res.json();
+      if (res.ok && result.success) {
+        setBanner({ type: "success", message: "Price alert resumed. Cron job will monitor and trigger popups." });
+        fetchAlerts();
+      } else {
+        setBanner({ type: "error", message: result.error || "Could not resume this alert." });
+      }
+    } catch (err) {
+      setBanner({ type: "error", message: "Could not resume alert." });
+    }
+  };
+
   const confirmStopAlert = async () => {
-    if (!stopTarget) return;
+    if (!stopTarget?.id) return;
     setStopping(true);
     try {
-      const res = await fetch(
-        `${BACKEND_URL}/api/price-alerts/${stopTarget.id}/stop?user_id=${encodeURIComponent(user.id)}`,
-        {
-          method: "PUT",
-          headers: authHeaders(),
-          body: JSON.stringify({ user_id: user.id })
-        }
-      );
-      const result = await res.json().catch(() => ({}));
+      const res = await fetch(`${BACKEND_URL}/api/price-alerts/${stopTarget.id}/stop`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ user_id: user.id })
+      });
+      const result = await res.json();
       if (res.ok && result.success) {
-        setBanner({ type: "success", message: result.message || "Price alert stopped successfully." });
+        setBanner({ type: "info", message: "Price alert paused." });
         setStopTarget(null);
         fetchAlerts();
       } else {
         setBanner({ type: "error", message: result.error || "Could not stop this alert." });
       }
     } catch (err) {
-      setBanner({ type: "error", message: "Could not stop this alert." });
+      setBanner({ type: "error", message: "Could not stop alert." });
     } finally {
       setStopping(false);
     }
   };
 
-  const handleResumeAlert = async (id) => {
+  const handleRunCronNow = async () => {
+    setEvaluatingCron(true);
     try {
-      const res = await fetch(
-        `${BACKEND_URL}/api/price-alerts/${id}/resume?user_id=${encodeURIComponent(user.id)}`,
-        {
-          method: "PUT",
-          headers: authHeaders(),
-          body: JSON.stringify({ user_id: user.id })
-        }
-      );
-      const result = await res.json().catch(() => ({}));
-      if (res.ok && result.success) {
-        setBanner({ type: "success", message: result.message || "Price alert resumed." });
-        fetchAlerts();
-      } else {
-        setBanner({ type: "error", message: result.error || "Could not resume this alert." });
-      }
-    } catch (err) {
-      setBanner({ type: "error", message: "Could not resume this alert." });
-    }
-  };
-
-  const handleSendTestSms = async () => {
-    const e164 = toE164India(testPhone || phone);
-    if (!e164) {
-      setBanner({ type: "error", message: "Enter a valid Indian mobile number to send a test SMS." });
-      return;
-    }
-    setSendingTest(true);
-    setBanner(null);
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/price-alerts/test-sms`, {
+      const res = await fetch(`${BACKEND_URL}/api/notifications/run-cron`, {
         method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify({ phone_number: e164, user_id: user?.id })
+        headers: authHeaders()
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setBanner({ type: "success", message: `Test SMS sent to ${data.to || e164}.` });
-      } else {
-        setBanner({ type: "error", message: data.error || "Failed to send test SMS." });
-      }
-    } catch (err) {
-      setBanner({ type: "error", message: "Network error while sending test SMS." });
-    } finally {
-      setSendingTest(false);
-    }
-  };
-
-  const handleEvaluateNow = async () => {
-    setBanner({ type: "info", message: "Checking live crop prices for active alerts..." });
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/check-price-alerts`, { method: "POST" });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setBanner({ type: "success", message: data.message || "Price evaluation complete." });
+        const trig = data.cron_result?.triggered || 0;
+        setBanner({
+          type: "success",
+          message: `Cron job check executed! Evaluated alerts against live market prices. (${trig} triggered).`
+        });
         fetchAlerts();
       } else {
-        setBanner({ type: "error", message: data.error || "Price check failed." });
+        setBanner({ type: "error", message: "Cron check evaluation failed." });
       }
     } catch (err) {
-      setBanner({ type: "error", message: "Could not check prices. Is the backend running?" });
+      setBanner({ type: "error", message: "Could not connect to backend Cron Job." });
+    } finally {
+      setEvaluatingCron(false);
     }
   };
 
@@ -295,9 +286,9 @@ function PriceAlertPage() {
     return (
       <div className="price-alert-page-container animate-fade-in">
         <div className="kisan-card" style={{ maxWidth: 520, margin: "2rem auto", textAlign: "center" }}>
-          <h2>Sign in to set SMS price alerts</h2>
+          <h2>Sign in to set Smart Price Alerts</h2>
           <p style={{ color: "var(--text-muted)", margin: "0.75rem 0 1.25rem" }}>
-            Crop price SMS alerts are saved to your Krishi Mitra account.
+            Get instant In-App Popups and email notifications when crops hit your desired selling price.
           </p>
           <Link to="/login" className="btn-primary">Go to Login</Link>
         </div>
@@ -310,20 +301,18 @@ function PriceAlertPage() {
       <div className="page-header-block">
         <div className="page-title-group">
           <h1>
-            <BellRingIcon size={28} color="#d97706" />
-            {t.priceAlerts || "Crop Price SMS Alerts"}
+            <BellRingIcon size={28} color="#10b981" />
+            {t.priceAlerts || "Smart Price Alerts & In-App Popups"}
           </h1>
-          <p>Set a target mandi rate and receive a <strong>Twilio SMS</strong> when the live crop price reaches your goal</p>
+          <p>
+            Automated background <strong>Cron Job</strong> continuously monitors live APMC mandi prices every 5 minutes and triggers instant <strong>In-App Popups</strong> and <strong>Email Alerts</strong> when your target price is reached.
+          </p>
         </div>
 
         <div className="page-header-actions">
-          <button className="btn-secondary" onClick={() => setShowTestPanel(!showTestPanel)}>
-            <SendIcon size={16} />
-            <span>{showTestPanel ? "Hide Test SMS" : "Send Test SMS"}</span>
-          </button>
-          <button className="btn-primary" onClick={handleEvaluateNow}>
+          <button className="btn-primary" onClick={handleRunCronNow} disabled={evaluatingCron}>
             <RefreshCwIcon size={16} />
-            <span>Check Prices Now</span>
+            <span>{evaluatingCron ? "Running Cron Job..." : "Run Cron Check Now"}</span>
           </button>
         </div>
       </div>
@@ -339,52 +328,27 @@ function PriceAlertPage() {
         </div>
       )}
 
-      {showTestPanel && (
-        <div className="kisan-card test-email-box">
-          <div className="test-email-header">
-            <SparklesIcon size={20} color="#15803d" />
-            <div>
-              <h4>Development: Test Twilio SMS</h4>
-              <p>Sends a simple test message. Disabled in production. Credentials stay on the backend.</p>
-            </div>
-          </div>
-          <div className="test-email-controls">
-            <input
-              type="tel"
-              placeholder="+919876543210"
-              value={testPhone}
-              onChange={(e) => setTestPhone(e.target.value)}
-              className="form-control-kisan"
-            />
-            <button className="btn-primary" onClick={handleSendTestSms} disabled={sendingTest}>
-              {sendingTest ? "Sending..." : "Send Test SMS"}
-            </button>
-          </div>
+      {/* Info card describing Cron Job and In-App Popups */}
+      <div className="cron-info-banner">
+        <div className="cron-info-icon">⚙️</div>
+        <div className="cron-info-content">
+          <h4>Cron Job Application Active</h4>
+          <p>
+            The background scheduler runs continuously at <code>*/5 * * * *</code> (every 5 minutes). When mandi rates hit your threshold, an animated <strong>In-App Popup Modal</strong> appears directly on your screen with sell guidance.
+          </p>
         </div>
-      )}
+      </div>
 
       <div className="alert-grid-layout">
         <div className="kisan-card">
           <div className="card-heading-line">
             <SproutIcon size={22} color="#15803d" />
-            <h3 style={{ fontSize: "1.2rem", fontWeight: "700" }}>Set Price Alert</h3>
+            <h3 style={{ fontSize: "1.2rem", fontWeight: "700" }}>Set Target Price Alert</h3>
           </div>
 
           <form onSubmit={handleCreateAlert} className="alert-form-body">
             <div className="form-group-field">
-              <label>Phone Number *</label>
-              <input
-                type="tel"
-                placeholder="+919876543210"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="form-control-kisan"
-                required
-              />
-            </div>
-
-            <div className="form-group-field">
-              <label>Crop *</label>
+              <label>Select Crop *</label>
               <select
                 value={crop}
                 onChange={(e) => setCrop(e.target.value)}
@@ -410,10 +374,10 @@ function PriceAlertPage() {
             )}
 
             <div className="form-group-field">
-              <label>Target Price (₹/Quintal) *</label>
+              <label>Target Selling Price (₹/Quintal) *</label>
               <input
                 type="number"
-                placeholder="2500"
+                placeholder="e.g. 2500"
                 value={targetPrice}
                 onChange={(e) => setTargetPrice(e.target.value)}
                 min="1"
@@ -423,8 +387,36 @@ function PriceAlertPage() {
               />
             </div>
 
-            <button type="submit" className="btn-primary" style={{ width: "100%", marginTop: "0.5rem" }} disabled={submitting}>
-              {submitting ? "Setting Alert..." : "Set Price Alert"}
+            <div className="form-group-field">
+              <label>Farmer Email (Optional for Email Alerts)</label>
+              <input
+                type="email"
+                placeholder="farmer@example.com"
+                value={farmerEmail}
+                onChange={(e) => setFarmerEmail(e.target.value)}
+                className="form-control-kisan"
+              />
+            </div>
+
+            <div className="form-group-field">
+              <label>Phone Number (Optional)</label>
+              <input
+                type="tel"
+                placeholder="9876543210"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="form-control-kisan"
+              />
+            </div>
+
+            <div className="channels-checklist">
+              <span className="channel-tag active">🔔 In-App Popup: Enabled</span>
+              <span className="channel-tag active">⚙️ Cron Job Watcher: Active</span>
+              {farmerEmail && <span className="channel-tag active">✉️ Email Alerts: Active</span>}
+            </div>
+
+            <button type="submit" className="btn-primary" style={{ width: "100%", marginTop: "0.75rem" }} disabled={submitting}>
+              {submitting ? "Saving Alert..." : "Set Price Alert"}
             </button>
           </form>
         </div>
@@ -432,21 +424,23 @@ function PriceAlertPage() {
         <div className="kisan-card alerts-feed-card">
           <div className="alerts-feed-header">
             <div>
-              <h3 style={{ fontSize: "1.2rem", fontWeight: "700" }}>My Price Alerts ({alerts.length})</h3>
-              <p style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>SMS alerts saved to your account</p>
+              <h3 style={{ fontSize: "1.2rem", fontWeight: "700" }}>Active Monitored Alerts ({alerts.length})</h3>
+              <p style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                Monitored by Background Cron Job
+              </p>
             </div>
           </div>
 
           {loadingAlerts ? (
             <div className="empty-state-kisan">
               <div className="kisan-spinner"></div>
-              <p style={{ marginTop: "1rem" }}>Loading your alerts...</p>
+              <p style={{ marginTop: "1rem" }}>Loading alerts...</p>
             </div>
           ) : alerts.length === 0 ? (
             <div className="empty-state-kisan">
               <div className="empty-state-icon-wrap">🔔</div>
               <h3>No Price Alerts Yet</h3>
-              <p>Enter your phone number, choose a crop, set a target price, then click Set Price Alert.</p>
+              <p>Choose a crop, specify your target price, and the Cron Job will watch for price spikes to trigger popups.</p>
             </div>
           ) : (
             <div className="alerts-card-grid">
@@ -459,30 +453,30 @@ function PriceAlertPage() {
                     className={`monitored-alert-item ${alert.alert_sent ? "triggered" : !isActive ? "disabled" : "active"}`}
                   >
                     <div className="alert-item-top">
-                      <h4 className="alert-crop-name">🌾 {alert.crop} Price Alert</h4>
+                      <h4 className="alert-crop-name">🌾 {alert.crop}</h4>
                       {alert.alert_sent ? (
-                        <span className="badge-pill success">SMS Sent</span>
+                        <span className="badge-pill success">🎉 Popup Triggered</span>
                       ) : isActive ? (
-                        <span className="badge-pill info">🟢 Alert Active</span>
+                        <span className="badge-pill info">🟢 Monitored by Cron</span>
                       ) : (
-                        <span className="badge-pill warning">🔴 Alert Stopped</span>
+                        <span className="badge-pill warning">🔴 Paused</span>
                       )}
                     </div>
 
-                    <p className="alert-market-sub">📱 {alert.phone_number || "No phone"}</p>
-                    <p className="alert-market-sub">💰 Target Price: ₹{target.toLocaleString()}/quintal</p>
+                    <p className="alert-market-sub">🎯 Target Price: <strong>₹{target.toLocaleString()}/Q</strong></p>
                     {Number(alert.current_price) > 0 && (
-                      <p className="alert-market-sub">📈 Current: ₹{Number(alert.current_price).toLocaleString()}/quintal</p>
+                      <p className="alert-market-sub">📊 Current Mandi: ₹{Number(alert.current_price).toLocaleString()}/Q</p>
                     )}
+                    <p className="alert-market-sub">🔔 Delivery: In-App Popup {alert.farmer_email ? "+ Email" : ""}</p>
 
                     <div className="alert-action-btn-group">
                       {isActive ? (
                         <button className="btn-alert-action" onClick={() => setStopTarget(alert)}>
-                          🔕 Stop Alert
+                          🔕 Pause
                         </button>
                       ) : (
                         <button className="btn-alert-action" onClick={() => handleResumeAlert(alert.id)}>
-                          🔔 Resume Alert
+                          🔔 Resume
                         </button>
                       )}
                       <button className="btn-alert-action delete" onClick={() => handleDeleteAlert(alert.id)}>
@@ -500,13 +494,13 @@ function PriceAlertPage() {
       {stopTarget && (
         <div className="alert-modal-backdrop" onClick={() => !stopping && setStopTarget(null)}>
           <div className="kisan-card alert-confirm-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Stop this price alert?</h3>
-            <p>Are you sure you want to stop this price alert?</p>
-            <p className="alert-market-sub">🌾 {stopTarget.crop} · 💰 ₹{Number(stopTarget.target_price).toLocaleString()}/quintal</p>
+            <h3>Pause this price alert?</h3>
+            <p>The cron job will stop checking target price for this crop until resumed.</p>
+            <p className="alert-market-sub">🌾 {stopTarget.crop} · Target: ₹{Number(stopTarget.target_price).toLocaleString()}/quintal</p>
             <div className="alert-confirm-actions">
               <button className="btn-secondary" disabled={stopping} onClick={() => setStopTarget(null)}>Cancel</button>
               <button className="btn-primary" disabled={stopping} onClick={confirmStopAlert}>
-                {stopping ? "Stopping..." : "Stop Alert"}
+                {stopping ? "Pausing..." : "Pause Alert"}
               </button>
             </div>
           </div>

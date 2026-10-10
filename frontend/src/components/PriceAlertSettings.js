@@ -3,6 +3,11 @@ import { useAuth } from "../context/AuthContext";
 import { BellRingIcon, CheckCircle2Icon } from "./Icons";
 import "./PriceAlertSettings.css";
 import API_BASE_URL from "../config";
+import {
+  requestPushPermission,
+  saveTargetAlert,
+  isPushEnabled
+} from "../utils/targetPricePush";
 
 const BACKEND_URL = API_BASE_URL;
 
@@ -51,6 +56,11 @@ function PriceAlertSettings({ crops = [] }) {
       setErrorMsg("Enter a valid target price greater than 0.");
       return;
     }
+
+    if (!isPushEnabled()) {
+      await requestPushPermission();
+    }
+    saveTargetAlert(crop, priceNum);
 
     setLoading(true);
     try {

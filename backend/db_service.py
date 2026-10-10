@@ -38,7 +38,7 @@ def _ensure_column(cursor, table, column, definition):
 
 
 def init_local_db():
-    """Ensure local SQLite table exists with schema matching existing alerts plus SMS fields."""
+    """Ensure local SQLite tables exist with schema for price alerts and in-app popup notifications."""
     conn = sqlite3.connect(LOCAL_DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
@@ -63,6 +63,24 @@ def init_local_db():
         SET active = COALESCE(active, alert_enabled, 1),
             updated_at = COALESCE(updated_at, created_at)
         WHERE active IS NULL OR updated_at IS NULL
+    """)
+
+    # 🔔 In-App Popup Notifications Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS in_app_notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            alert_id INTEGER,
+            crop TEXT NOT NULL,
+            market TEXT NOT NULL DEFAULT 'All Markets',
+            current_price REAL NOT NULL,
+            target_price REAL NOT NULL,
+            title TEXT NOT NULL,
+            message TEXT NOT NULL,
+            is_read INTEGER DEFAULT 0,
+            is_popup_dismissed INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now', 'localtime'))
+        )
     """)
     conn.commit()
     conn.close()
@@ -418,3 +436,126 @@ def delete_alert(alert_id):
     except Exception as e:
         print(f"[Local DB Delete Error]: {e}")
         return False
+
+
+# =========================================================================
+# 🔔 IN-APP POPUP NOTIFICATION HELPERS
+# =========================================================================
+
+def create_in_app_notification(
+    user_id: str,
+    alert_id: int,
+    crop: str,
+    market: str,
+    current_price: float,
+    target_price: float,
+    title: str,
+    message: str,
+):
+    """Save an in-app popup notification to be displayed to the farmer."""
+    try:
+        conn = sqlite3.connect(LOCAL_DB_PATH)
+        cursor = conn.cursor()
+        created_at = _now()
+        cursor.execute(
+            """
+            INSERT INTO in_app_notifications (
+                user_id, alert_id, crop, market, current_price, target_price,
+                title, message, is_read, is_popup_dismissed, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)
+            """,
+            (
+                str(user_id or ""),
+                alert_id,
+                str(crop),
+                str(market or "All Markets"),
+                float(current_price),
+                float(target_price),
+                str(title),
+                str(message),
+                created_at,
+            ),
+        )
+        conn.commit()
+        notif_id = cursor.lastrowid
+        conn.close()
+        return {"success": True, "id": notif_id}
+    except Exception as e:
+        print(f"[DB Error create_in_app_notification]: {e}")
+        return {"success": False, "error": str(e)}
+
+
+def get_in_app_notifications(user_id: str = None, popup_only: bool = False, limit: int = 50):
+    """Retrieve in-app notifications. Can filter for pending undismissed popups."""
+    try:
+        conn = sqlite3.connect(LOCAL_DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        query = "SELECT * FROM in_app_notifications WHERE 1=1"
+        params = []
+        if user_id:
+            query += " AND (user_id = ? OR user_id = '' OR user_id IS NULL)"
+            params.append(str(user_id))
+        if popup_only:
+            query += " AND is_popup_dismissed = 0"
+        query += " ORDER BY id DESC LIMIT ?"
+        params.append(limit)
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        print(f"[DB Error get_in_app_notifications]: {e}")
+        return []
+
+
+def dismiss_notification_popup(notification_id: int):
+    """Mark a popup notification as dismissed so it doesn't show again as a modal."""
+    try:
+        conn = sqlite3.connect(LOCAL_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE in_app_notifications SET is_popup_dismissed = 1 WHERE id = ?",
+            (notification_id,),
+        )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"[DB Error dismiss_notification_popup]: {e}")
+        return False
+
+
+def mark_notification_read(notification_id: int):
+    """Mark notification as read and dismissed."""
+    try:
+        conn = sqlite3.connect(LOCAL_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE in_app_notifications SET is_read = 1, is_popup_dismissed = 1 WHERE id = ?",
+            (notification_id,),
+        )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"[DB Error mark_notification_read]: {e}")
+        return False
+
+
+def clear_notifications(user_id: str = None):
+    """Clear all in-app notifications for a user."""
+    try:
+        conn = sqlite3.connect(LOCAL_DB_PATH)
+        cursor = conn.cursor()
+        if user_id:
+            cursor.execute("DELETE FROM in_app_notifications WHERE user_id = ?", (str(user_id),))
+        else:
+            cursor.execute("DELETE FROM in_app_notifications")
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"[DB Error clear_notifications]: {e}")
+        return False
+

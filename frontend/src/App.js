@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import Sidebar from "./components/Sidebar";
 import TopHeader from "./components/TopHeader";
 import Chatbot from "./components/Chatbot";
+import InAppNotificationPopup from "./components/InAppNotificationPopup";
 
 import Dashboard from "./pages/Dashboard";
 import PriceListPage from "./pages/PriceListPage";
@@ -47,6 +48,9 @@ function AppLayout() {
       {/* 🌿 Main Content Area */}
       <div className="main-content-wrapper">
         <TopHeader onOpenSidebar={() => setIsSidebarOpen(true)} />
+
+        {/* 🔔 In-App Popup Alerts Triggered by Cron Job */}
+        <InAppNotificationPopup />
 
         <main className="page-container">
           <Routes>

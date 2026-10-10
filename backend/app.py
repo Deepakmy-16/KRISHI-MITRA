@@ -73,21 +73,22 @@ def load_data():
 load_data()
 
 def run_price_alert_checks():
-    """Background task to evaluate price alerts against current data"""
+    """Background Cron Job task to evaluate price alerts and trigger in-app popups & email alerts."""
     try:
         load_data()
         if DATA:
             res = alert_checker.check_and_trigger_price_alerts(DATA)
-            if res.get("triggered", 0) > 0:
-                print(f"[Scheduler] Triggered {res['triggered']} price alert emails.")
+            triggered = res.get("triggered", 0)
+            if triggered > 0:
+                print(f"[Cron Job Alert Checker] Successfully triggered {triggered} in-app popups & email alerts.")
     except Exception as e:
-        print(f"[Scheduler Alert Check Error]: {e}")
+        print(f"[Cron Job Alert Check Error]: {e}")
 
-# 🕒 AUTOMATIC SCHEDULER (Scrapers & Price Alert Evaluation)
+# 🕒 AUTOMATIC CRON JOB SCHEDULER (Scrapers & Price Alert Evaluation)
 scheduler = BackgroundScheduler()
-scheduler.add_job(func=scrape_schemes, trigger="interval", hours=24)
-scheduler.add_job(func=fetch_realtime_prices, trigger="interval", hours=12) # Update prices every 12h
-scheduler.add_job(func=run_price_alert_checks, trigger="interval", minutes=5) # Check alerts every 5 mins
+scheduler.add_job(func=scrape_schemes, trigger="interval", hours=24, id="cron_schemes_scraper")
+scheduler.add_job(func=fetch_realtime_prices, trigger="interval", hours=12, id="cron_mandi_price_sync") # Update prices every 12h
+scheduler.add_job(func=run_price_alert_checks, trigger="interval", minutes=5, id="cron_price_alert_checker") # Cron Job: checks every 5 mins
 scheduler.start()
 
 def initial_sync():
@@ -196,8 +197,8 @@ def test_price_alert_sms():
 @app.route("/api/price-alerts", methods=["POST"])
 def create_price_alert():
     """
-    Create a crop price SMS alert.
-    Request JSON: { "phone_number", "crop", "target_price", "user_id" }
+    Create a crop price alert with In-App Popup and Email notifications.
+    Request JSON: { "crop", "target_price", "market", "farmer_email", "phone_number", "user_id" }
     """
     try:
         data = request.get_json() or {}
@@ -212,12 +213,7 @@ def create_price_alert():
         if not user_id:
             return jsonify({"success": False, "error": "Please sign in to set a price alert."}), 401
 
-        phone_number = normalize_indian_phone(phone_raw)
-        if not phone_number:
-            return jsonify({
-                "success": False,
-                "error": "Enter a valid Indian mobile number (10 digits starting with 6-9, or +91...)."
-            }), 400
+        phone_number = normalize_indian_phone(phone_raw) if phone_raw else ""
 
         if not crop:
             return jsonify({"success": False, "error": "Please select a crop."}), 400
@@ -251,32 +247,28 @@ def create_price_alert():
         saved_alert = db_res.get("alert", {})
 
         load_data()
-        _, current_price = alert_checker.find_crop_price(crop, market, DATA)
-        sms_sent = False
-        sms_warning = None
+        matched_rec, current_price = alert_checker.find_crop_price(crop, market, DATA)
+        market_display = (matched_rec.get("Market") or matched_rec.get("market") or market) if matched_rec else market
 
+        immediate_triggered = False
         if alert_enabled and current_price >= target_price and current_price > 0:
-            sms_res = send_price_alert_sms(phone_number, crop, current_price, target_price)
-            if sms_res.get("success"):
+            ok, _ = alert_checker._dispatch_alert(saved_alert, current_price, market_display)
+            if ok:
                 db_service.mark_alert_as_sent(saved_alert.get("id"))
                 saved_alert["alert_sent"] = True
-                sms_sent = True
-            else:
-                sms_warning = sms_res.get("error") or "Could not send SMS yet. The alert is saved and will retry."
+                immediate_triggered = True
 
         saved_alert["current_price"] = current_price
-        saved_alert["immediate_sms_sent"] = sms_sent
-        if sms_warning:
-            saved_alert["sms_warning"] = sms_warning
+        saved_alert["immediate_triggered"] = immediate_triggered
 
-        message = "Price alert created successfully."
-        if sms_sent:
-            message = "Price alert created and SMS sent because the target price is already reached."
+        message = "Price alert created successfully. You will receive an in-app popup and email when your target price is reached."
+        if immediate_triggered:
+            message = f"Target price of ₹{target_price} is already reached (Current: ₹{current_price})! In-app popup created."
 
         return jsonify({"success": True, "message": message, "alert": saved_alert}), 201
 
-    except Exception:
-        return jsonify({"success": False, "error": "Could not create the price alert. Please try again."}), 500
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Could not create the price alert: {e}"}), 500
 
 
 @app.route("/api/price-alerts", methods=["GET"])
@@ -345,6 +337,50 @@ def delete_price_alert(alert_id):
         return jsonify({"success": False, "error": "Could not delete this price alert."}), 500
     except Exception:
         return jsonify({"success": False, "error": "Could not delete this price alert."}), 500
+
+
+# =========================================================================
+# 🔔 IN-APP POPUP NOTIFICATIONS API ENDPOINTS
+# =========================================================================
+
+@app.route("/api/notifications", methods=["GET"])
+def get_notifications():
+    """Retrieve in-app notifications for the farmer. Supports ?popup=1 query parameter."""
+    user_id = _request_user_id()
+    popup_only = request.args.get("popup", "").lower() in ("1", "true", "yes")
+    notifs = db_service.get_in_app_notifications(user_id=user_id, popup_only=popup_only)
+    return jsonify({"success": True, "count": len(notifs), "notifications": notifs})
+
+
+@app.route("/api/notifications/<int:notification_id>/dismiss", methods=["POST"])
+def dismiss_popup(notification_id):
+    """Dismiss popup modal so it does not pop up again."""
+    ok = db_service.dismiss_notification_popup(notification_id)
+    return jsonify({"success": ok})
+
+
+@app.route("/api/notifications/<int:notification_id>/read", methods=["POST"])
+def mark_notification_read(notification_id):
+    """Mark notification as read and dismissed."""
+    ok = db_service.mark_notification_read(notification_id)
+    return jsonify({"success": ok})
+
+
+@app.route("/api/notifications", methods=["DELETE"])
+def clear_all_notifications():
+    """Clear all in-app notifications for user."""
+    user_id = _request_user_id()
+    ok = db_service.clear_notifications(user_id=user_id)
+    return jsonify({"success": ok})
+
+
+@app.route("/api/notifications/run-cron", methods=["POST", "GET"])
+def trigger_cron_manually():
+    """Run the cron price alert checker on-demand."""
+    load_data()
+    res = alert_checker.check_and_trigger_price_alerts(DATA)
+    return jsonify({"success": True, "cron_result": res})
+
 
 
 @app.route("/api/price-alerts/<alert_id>/toggle", methods=["PATCH", "POST"])

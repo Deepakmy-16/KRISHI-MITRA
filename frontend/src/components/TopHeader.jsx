@@ -20,6 +20,7 @@ function TopHeader({ onOpenSidebar }) {
   const [lang, setLang] = useState("en");
   const [searchQuery, setSearchQuery] = useState("");
   const [marketData, setMarketData] = useState([]);
+  const [notifCount, setNotifCount] = useState(0);
 
   useEffect(() => {
     const saved = localStorage.getItem("lang") || "en";
@@ -32,7 +33,19 @@ function TopHeader({ onOpenSidebar }) {
         if (Array.isArray(json)) setMarketData(json);
       })
       .catch((err) => console.warn("Header data fetch error:", err));
-  }, []);
+
+    // Fetch active notifications count
+    const userIdParam = user?.id ? `?user_id=${encodeURIComponent(user.id)}` : "";
+    fetch(`${API_BASE_URL}/api/notifications${userIdParam}`)
+      .then((res) => res.json())
+      .then((json) => {
+        if (json?.notifications) {
+          const unread = json.notifications.filter((n) => !n.is_read).length;
+          setNotifCount(unread);
+        }
+      })
+      .catch(() => {});
+  }, [user?.id]);
 
   const handleLangChange = (e) => {
     const newLang = e.target.value;
@@ -137,10 +150,14 @@ function TopHeader({ onOpenSidebar }) {
         <Link
           to="/price-alerts"
           className="header-icon-btn alert-bell"
-          title="Smart Price Alerts"
+          title="Smart Price Alerts (Cron Job Active)"
         >
           <BellRingIcon size={20} />
-          <span className="alert-ping-dot"></span>
+          {notifCount > 0 ? (
+            <span className="alert-count-badge">{notifCount}</span>
+          ) : (
+            <span className="alert-ping-dot"></span>
+          )}
         </Link>
 
         {/* Farmer Profile Badge */}

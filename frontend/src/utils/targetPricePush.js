@@ -83,16 +83,43 @@ export function triggerBrowserPush({ title, body, icon = "/icon-192.png", data =
   }
 
   try {
-    if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+    // Optional audio alert chime using Web Audio API
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) {
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+        osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15); // A5
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.4);
+      }
+    } catch {
+      // Audio playback non-critical failure fallback
+    }
+
+    if ("serviceWorker" in navigator) {
       navigator.serviceWorker.ready.then((reg) => {
         reg.showNotification(title, {
           body,
           icon,
           badge: "/icon-192.png",
           vibrate: [200, 100, 200, 100, 200],
-          tag: "target-price-" + (data.crop || "alert"),
+          tag: "target-price-" + (data.crop || "alert") + "-" + Date.now(),
           renotify: true,
-          data: { url: "/price-list" },
+          data: { url: "/price-alerts" },
+        });
+      }).catch(() => {
+        new Notification(title, {
+          body,
+          icon,
+          tag: "target-price-" + (data.crop || "alert"),
         });
       });
       return true;
@@ -166,7 +193,9 @@ export function evaluateTargetPrices(mandiData) {
     });
 
     for (const match of matches) {
-      const price = Number(match.Modal_x0020_Price || match.modal_price || 0);
+      const rawPrice = match.Modal_x0020_Price || match.modal_price || match.price || match.Max_x0020_Price || match.Min_x0020_Price || 0;
+      const cleanPriceStr = String(rawPrice).replace(/[^0-9.]/g, "");
+      const price = Number(cleanPriceStr);
       if (!price) continue;
 
       const isTargetMet =
