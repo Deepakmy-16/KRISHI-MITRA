@@ -46,7 +46,12 @@ function ComparisonChart({ cropA, cropB, data }) {
 
   const maxLen = Math.max(cropAData.length, cropBData.length, 1);
   const labels = Array.from({ length: maxLen }, (_, i) => {
-    return cropAData[i]?.Market || cropBData[i]?.Market || `Mandi ${i + 1}`;
+    const itemA = cropAData[i];
+    const itemB = cropBData[i];
+    const market = itemA?.Market || itemB?.Market || `Mandi ${i + 1}`;
+    const state = itemA?.State || itemB?.State || "";
+    const date = itemA?.Arrival_Date || itemB?.Arrival_Date || "";
+    return state ? [market, `${state}${date ? ` • ${date}` : ""}`] : market;
   });
 
   const chartData = {
@@ -100,7 +105,17 @@ function ComparisonChart({ cropA, cropB, data }) {
         padding: 12,
         cornerRadius: 8,
         callbacks: {
-          label: (context) => ` ${context.dataset.label}: ₹${Number(context.raw).toLocaleString()}`
+          label: (context) => {
+            const idx = context.dataIndex;
+            const dsIdx = context.datasetIndex;
+            const item = dsIdx === 0 ? cropAData[idx] : cropBData[idx];
+            const lines = [` ${context.dataset.label}: ₹${Number(context.raw).toLocaleString()} / Quintal`];
+            if (item) {
+              if (item.State) lines.push(` 🏛️ State: ${item.State}`);
+              if (item.Arrival_Date) lines.push(` 📅 Date: ${item.Arrival_Date}`);
+            }
+            return lines;
+          }
         }
       }
     },
