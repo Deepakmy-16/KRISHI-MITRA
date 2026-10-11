@@ -599,11 +599,11 @@ function FarmerHistoryPage() {
 
                   <div className="modal-cta-box">
                     <Link
-                      to="/disease-guide"
+                      to="/plant-disease"
                       className="modal-link-btn"
                       onClick={() => setSelectedActivity(null)}
                     >
-                      <span>Explore Crop Disease & Fertilizer Guide</span>
+                      <span>Open AI Plant Disease Detection Lab</span>
                       <ExternalLinkIcon size={16} />
                     </Link>
                   </div>

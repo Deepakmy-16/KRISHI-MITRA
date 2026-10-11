@@ -51,15 +51,10 @@ function Sidebar({ isOpen, onClose }) {
     },
     {
       to: "/plant-disease",
-      label: t.aiPlantDisease || "AI Disease Detection",
+      label: t.aiPlantDisease || "AI Plant Disease Detection",
       icon: ShieldAlertIcon,
       badge: "AI",
       highlight: true
-    },
-    {
-      to: "/disease-guide",
-      label: t.diseaseGuide || "Crop Spray Guide",
-      icon: BookOpenIcon
     },
     {
       to: "/price-list",

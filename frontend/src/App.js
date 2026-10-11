@@ -14,7 +14,6 @@ import ComparisonPage from "./pages/ComparisonPage";
 import FertilizerPage from "./pages/FertilizerPage";
 import CropSeedRecommendationPage from "./pages/CropSeedRecommendationPage";
 import SeasonGuidePage from "./pages/SeasonGuidePage";
-import DiseaseFertilizerPage from "./pages/DiseaseFertilizerPage";
 import PlantDiseasePage from "./pages/PlantDiseasePage";
 import WeatherPage from "./pages/WeatherPage";
 import MapPage from "./pages/MapPage";
@@ -70,9 +69,7 @@ function AppLayout() {
 
             {/* 4. AI Plant Disease Detection */}
             <Route path="/plant-disease" element={<PlantDiseasePage />} />
-
-            {/* 5. Crop Disease & Spray Guide */}
-            <Route path="/disease-guide" element={<DiseaseFertilizerPage />} />
+            <Route path="/disease-guide" element={<Navigate to="/plant-disease" replace />} />
 
             {/* 5. Price Intelligence */}
             <Route path="/price-list" element={<PriceListPage />} />
