@@ -69,7 +69,6 @@ function AppLayout() {
 
             {/* 4. AI Plant Disease Detection */}
             <Route path="/plant-disease" element={<PlantDiseasePage />} />
-            <Route path="/disease-guide" element={<Navigate to="/plant-disease" replace />} />
 
             {/* 5. Price Intelligence */}
             <Route path="/price-list" element={<PriceListPage />} />
