@@ -99,5 +99,91 @@ class TestPlantDiseaseIntegration(unittest.TestCase):
         res_data = self.client.get("/api/data")
         self.assertEqual(res_data.status_code, 200)
 
+    def test_08_predict_potato_leaf_without_crop_param(self):
+        """Test POST /api/plant-disease/predict with potato image without selected_crop."""
+        sample_img = os.path.join(TESTS_DIR, "test_images", "potato_early_blight.JPG")
+        if not os.path.exists(sample_img):
+            self.skipTest(f"Test image not found at {sample_img}")
+
+        with open(sample_img, "rb") as f:
+            img_bytes = f.read()
+
+        data = {
+            "image": (io.BytesIO(img_bytes), "potato_early_blight.JPG")
+        }
+        res = self.client.post("/api/plant-disease/predict", data=data, content_type="multipart/form-data")
+        self.assertEqual(res.status_code, 200)
+        json_data = res.get_json()
+        self.assertTrue(json_data.get("success"))
+        self.assertEqual(json_data["plant"], "Potato")
+        self.assertIn("Early blight", json_data["disease"])
+
+    def test_09_predict_potato_leaf_with_crop_param(self):
+        """Test POST /api/plant-disease/predict with potato image and selected_crop='Potato'."""
+        sample_img = os.path.join(TESTS_DIR, "test_images", "potato_late_blight.JPG")
+        if not os.path.exists(sample_img):
+            self.skipTest(f"Test image not found at {sample_img}")
+
+        with open(sample_img, "rb") as f:
+            img_bytes = f.read()
+
+        data = {
+            "image": (io.BytesIO(img_bytes), "potato_late_blight.JPG"),
+            "selected_crop": "Potato"
+        }
+        res = self.client.post("/api/plant-disease/predict", data=data, content_type="multipart/form-data")
+        self.assertEqual(res.status_code, 200)
+        json_data = res.get_json()
+        self.assertTrue(json_data.get("success"))
+        self.assertFalse(json_data.get("is_mismatch", False))
+        self.assertEqual(json_data["plant"], "Potato")
+        self.assertIn("blight", json_data["disease"].lower())
+
+    def test_10_crop_mismatch_detection(self):
+        """Test POST /api/plant-disease/predict detects mismatch when user chose Potato but uploaded Tomato leaf."""
+        sample_img = os.path.join(TESTS_DIR, "test_images", "tomato_early_blight.JPG")
+        if not os.path.exists(sample_img):
+            self.skipTest(f"Test image not found at {sample_img}")
+
+        with open(sample_img, "rb") as f:
+            img_bytes = f.read()
+
+        data = {
+            "image": (io.BytesIO(img_bytes), "tomato_early_blight.JPG"),
+            "selected_crop": "Potato"  # User chose Potato, but image is Tomato!
+        }
+        res = self.client.post("/api/plant-disease/predict", data=data, content_type="multipart/form-data")
+        self.assertEqual(res.status_code, 200)
+        json_data = res.get_json()
+        self.assertTrue(json_data.get("success"))
+        self.assertTrue(json_data.get("is_mismatch"))
+        self.assertEqual(json_data.get("mismatch_type"), "crop_mismatch")
+        self.assertEqual(json_data.get("selected_crop"), "Potato")
+        self.assertEqual(json_data.get("detected_crop"), "Tomato")
+        self.assertIn("Tomato", json_data.get("message", ""))
+        print(f"\n[Test Result Mismatch] Message: {json_data.get('message')}")
+
+    def test_11_invalid_image_mismatch(self):
+        """Test POST /api/plant-disease/predict detects mismatch for background_without_leaves."""
+        sample_img = os.path.join(TESTS_DIR, "test_images", "background_without_leaves.jpg")
+        if not os.path.exists(sample_img):
+            self.skipTest(f"Test image not found at {sample_img}")
+
+        with open(sample_img, "rb") as f:
+            img_bytes = f.read()
+
+        data = {
+            "image": (io.BytesIO(img_bytes), "background_without_leaves.jpg"),
+            "selected_crop": "Tomato"
+        }
+        res = self.client.post("/api/plant-disease/predict", data=data, content_type="multipart/form-data")
+        self.assertEqual(res.status_code, 200)
+        json_data = res.get_json()
+        self.assertTrue(json_data.get("success"))
+        self.assertTrue(json_data.get("is_mismatch"))
+        self.assertEqual(json_data.get("mismatch_type"), "invalid_image")
+        print(f"\n[Test Result Invalid Leaf] Message: {json_data.get('message')}")
+
 if __name__ == "__main__":
     unittest.main()
+

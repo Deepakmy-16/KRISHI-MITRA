@@ -667,3 +667,209 @@
 .kisan-table tbody tr:hover {
   background: #f8fafc;
 }
+
+/* 🌾 Quick Crop Selector Chips */
+.crop-chip-btn {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  padding: 6px 14px;
+  border-radius: var(--radius-full, 9999px);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.crop-chip-btn:hover {
+  border-color: var(--primary, #15803d);
+  color: var(--primary-dark, #14532d);
+  background: #f0fdf4;
+}
+
+.crop-chip-btn.active {
+  background: var(--primary, #15803d);
+  color: #ffffff;
+  border-color: var(--primary, #15803d);
+  box-shadow: 0 2px 6px rgba(21, 128, 61, 0.25);
+}
+
+/* ⚠️ Mismatch Alert Box */
+.mismatch-result-box {
+  background: #fff;
+  border: 2px solid #f87171;
+  border-radius: var(--radius-lg, 16px);
+  padding: 1.5rem;
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.08);
+}
+
+.mismatch-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 1.25rem;
+}
+
+.mismatch-icon-badge {
+  background: #fee2e2;
+  border-radius: 12px;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mismatch-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #991b1b;
+  margin-bottom: 0.2rem;
+}
+
+.mismatch-subtitle {
+  font-size: 0.875rem;
+  color: #7f1d1d;
+  line-height: 1.4;
+}
+
+/* Side by side comparison */
+.mismatch-comparison-grid {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.comparison-card {
+  flex: 1;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.comparison-card.user-selection {
+  border-left: 4px solid #3b82f6;
+}
+
+.comparison-card.ai-detection {
+  border-left: 4px solid #dc2626;
+}
+
+.comparison-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  color: #64748b;
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
+.comparison-value {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.comparison-sub {
+  font-size: 0.75rem;
+  color: #64748b;
+  display: block;
+  margin-top: 0.2rem;
+}
+
+.comparison-vs {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #ef4444;
+  background: #ffffff;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+.mismatch-message-banner {
+  background: #fff7ed;
+  border-left: 4px solid #f97316;
+  border-radius: 6px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.875rem;
+  color: #9a3412;
+  line-height: 1.5;
+}
+
+.mismatch-actions-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.btn-switch-crop {
+  width: 100%;
+  padding: 12px 18px;
+  background: linear-gradient(135deg, #15803d, #166534);
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 2px 8px rgba(21, 128, 61, 0.2);
+}
+
+.btn-switch-crop:hover {
+  background: linear-gradient(135deg, #166534, #14532d);
+  transform: translateY(-1px);
+}
+
+.btn-reupload-correct {
+  width: 100%;
+  padding: 10px 16px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-reupload-correct:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.crop-match-confirmed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #14532d;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-full, 9999px);
+  margin-bottom: 0.75rem;
+}
+

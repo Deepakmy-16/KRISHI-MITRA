@@ -15,11 +15,13 @@ def predict():
 
     image_file = request.files["image"]
     user_id = request.form.get("user_id")
+    selected_crop = request.form.get("selected_crop", "").strip() or None
 
     result, status_code = predict_leaf_image(
         file_storage=image_file,
         user_id=user_id,
-        filename=image_file.filename
+        filename=image_file.filename,
+        selected_crop=selected_crop
     )
     return jsonify(result), status_code
 

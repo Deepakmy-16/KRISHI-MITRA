@@ -28,6 +28,7 @@ function PlantDiseasePage() {
   const [dragActive, setDragActive] = useState(false);
   const [history, setHistory] = useState([]);
   const [classes, setClasses] = useState({});
+  const [selectedCrop, setSelectedCrop] = useState("");
   const [showClasses, setShowClasses] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -110,6 +111,9 @@ function PlantDiseasePage() {
 
     const formData = new FormData();
     formData.append("image", file);
+    if (selectedCrop) {
+      formData.append("selected_crop", selectedCrop);
+    }
 
     try {
       const res = await fetch(`${API_BASE}/api/plant-disease/predict`, {
@@ -181,6 +185,87 @@ function PlantDiseasePage() {
             <span className="card-badge-info">Deep Learning CNN</span>
           </div>
 
+          {/* 🌾 Step 1: Crop Selection with Quick Chips & Dropdown */}
+          <div className="crop-filter-group" style={{ marginBottom: "1.25rem" }}>
+            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: "700", color: "var(--text-main)", marginBottom: "0.5rem" }}>
+              🌾 Step 1: Select Crop Type to Diagnose:
+            </label>
+            <div className="crop-chips-scroll" style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.65rem" }}>
+              {["Tomato", "Potato", "Corn", "Apple", "Grape", "Pepper bell", "Rice", "Wheat", "Soybean", "Strawberry"].map((crop) => (
+                <button
+                  key={crop}
+                  type="button"
+                  className={`crop-chip-btn ${selectedCrop.toLowerCase() === crop.toLowerCase() ? "active" : ""}`}
+                  onClick={() => setSelectedCrop(selectedCrop.toLowerCase() === crop.toLowerCase() ? "" : crop)}
+                >
+                  {crop}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+              <select
+                value={selectedCrop}
+                onChange={(e) => setSelectedCrop(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.55rem 0.85rem",
+                  borderRadius: "8px",
+                  border: "1px solid var(--border-subtle, #cbd5e1)",
+                  fontSize: "0.9rem",
+                  backgroundColor: "#ffffff",
+                  color: "#1e293b",
+                  cursor: "pointer",
+                  outline: "none"
+                }}
+              >
+                <option value="">🌱 Auto-Detect Crop (All detectable crops)</option>
+                {Object.keys(classes).length > 0 ? (
+                  Object.keys(classes).sort().map((crop) => (
+                    <option key={crop} value={crop}>
+                      {crop}
+                    </option>
+                  ))
+                ) : (
+                  ["Apple", "Blueberry", "Cherry", "Corn", "Grape", "Orange", "Peach", "Pepper bell", "Potato", "Raspberry", "Soybean", "Squash", "Strawberry", "Tomato"].map((crop) => (
+                    <option key={crop} value={crop}>
+                      {crop}
+                    </option>
+                  ))
+                )}
+              </select>
+              {selectedCrop && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedCrop("")}
+                  style={{
+                    background: "#f1f5f9",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: "8px",
+                    padding: "0.55rem 0.75rem",
+                    fontSize: "0.8rem",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    color: "#64748b"
+                  }}
+                  title="Clear crop filter"
+                >
+                  ✕ Clear
+                </button>
+              )}
+            </div>
+            <span style={{ fontSize: "0.75rem", color: "var(--text-muted, #64748b)", display: "block", marginTop: "0.35rem" }}>
+              {selectedCrop ? (
+                <span>Filtering for <b>{selectedCrop}</b>. Uploading another crop leaf will flag a <b>Crop Mismatch</b>.</span>
+              ) : (
+                <span>Select your crop above, or let AI automatically identify both crop species and pathology.</span>
+              )}
+            </span>
+          </div>
+
+          <label style={{ display: "block", fontSize: "0.85rem", fontWeight: "700", color: "var(--text-main)", marginBottom: "0.4rem" }}>
+            🍃 Step 2: Upload Leaf Photograph:
+          </label>
           <div
             className={`dropzone ${dragActive ? "drag-active" : ""}`}
             onDragEnter={handleDrag}
@@ -227,7 +312,7 @@ function PlantDiseasePage() {
               ) : (
                 <>
                   <SparklesIcon size={18} />
-                  <span>Analyze Leaf Image</span>
+                  <span>Diagnose Leaf & Check Match</span>
                 </>
               )}
             </button>
@@ -259,8 +344,7 @@ function PlantDiseasePage() {
               <span className="empty-icon">🌿</span>
               <h3>No Leaf Analyzed Yet</h3>
               <p>
-                Upload an image on the left and click <b>Analyze Leaf Image</b> to see the AI diagnosis,
-                confidence rating, and prevention tips.
+                Select your crop type, upload a leaf photograph on the left, and click <b>Diagnose Leaf & Check Match</b> to see the AI diagnosis.
               </p>
             </div>
           )}
@@ -269,11 +353,104 @@ function PlantDiseasePage() {
             <div className="loading-inference-box">
               <div className="loading-pulsar">🔬</div>
               <h3>Analyzing Crop Leaf with Neural Network...</h3>
-              <p>Scanning visual symptoms across 39 agricultural pathogen classes.</p>
+              <p>Scanning visual symptoms, verifying crop species match, and classifying pathogen symptoms.</p>
             </div>
           )}
 
-          {result && (
+          {result && result.is_mismatch ? (
+            /* ⚠️ Mismatch Result View */
+            <div className="mismatch-result-box animate-fade-in">
+              <div className="mismatch-header">
+                <div className="mismatch-icon-badge">
+                  <AlertTriangleIcon size={28} color="#dc2626" />
+                </div>
+                <div>
+                  <h3 className="mismatch-title">
+                    {result.mismatch_type === "crop_mismatch"
+                      ? "⚠️ Crop Mismatch Detected!"
+                      : "⚠️ Image Mismatch: Invalid Leaf Photo"}
+                  </h3>
+                  <p className="mismatch-subtitle">
+                    {result.mismatch_type === "crop_mismatch"
+                      ? `The uploaded leaf does not match your selected crop (${result.selected_crop}).`
+                      : "The uploaded photograph was not recognized as an agricultural plant leaf."}
+                  </p>
+                </div>
+              </div>
+
+              {result.mismatch_type === "crop_mismatch" && (
+                <div className="mismatch-comparison-grid">
+                  <div className="comparison-card user-selection">
+                    <span className="comparison-label">Your Selection</span>
+                    <div className="comparison-value">🌾 {result.selected_crop}</div>
+                    <span className="comparison-sub">Selected in dropdown</span>
+                  </div>
+                  <div className="comparison-vs">VS</div>
+                  <div className="comparison-card ai-detection">
+                    <span className="comparison-label">AI Detected Leaf</span>
+                    <div className="comparison-value">🍃 {result.detected_crop || result.plant}</div>
+                    <span className="comparison-sub">
+                      Condition: <b>{result.detected_disease || result.disease}</b> ({result.confidence}%)
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div className="mismatch-message-banner">
+                <p>{result.message}</p>
+              </div>
+
+              <div className="mismatch-actions-row">
+                {result.mismatch_type === "crop_mismatch" && (result.detected_crop || result.plant) && (
+                  <button
+                    type="button"
+                    className="btn-switch-crop"
+                    onClick={() => {
+                      const newCrop = result.detected_crop || result.plant;
+                      setSelectedCrop(newCrop);
+                      setResult((prev) => ({
+                        ...prev,
+                        is_mismatch: false,
+                        plant: newCrop,
+                        disease: result.detected_disease || result.disease,
+                        status: (result.detected_disease || result.disease || "").toLowerCase().includes("healthy") ? "Healthy" : "Diseased"
+                      }));
+                    }}
+                  >
+                    <span>🔄 Switch Crop to {result.detected_crop || result.plant} & View Diagnosis</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  className="btn-reupload-correct"
+                  onClick={() => {
+                    setFile(null);
+                    setPreviewUrl(null);
+                    setResult(null);
+                    if (fileInputRef.current) fileInputRef.current.click();
+                  }}
+                >
+                  <span>📷 Upload {result.selected_crop ? `a ${result.selected_crop}` : "New"} Leaf</span>
+                </button>
+              </div>
+
+              {result.recommendations && result.recommendations.length > 0 && (
+                <div className="guidance-section" style={{ marginTop: "1.25rem" }}>
+                  <h4>💡 What should you do?</h4>
+                  <ul className="recommendations-list">
+                    {result.recommendations.map((step, idx) => (
+                      <li key={idx}>
+                        <span className="step-bullet">•</span>
+                        <span>{step}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : result ? (
+            /* ✅ Matched / Valid Diagnosis View */
             <div className="diagnosis-content animate-fade-in">
               <div className="result-header-row">
                 <span className="crop-pill">
@@ -294,6 +471,13 @@ function PlantDiseasePage() {
                   )}
                 </span>
               </div>
+
+              {selectedCrop && (
+                <div className="crop-match-confirmed-badge">
+                  <CheckCircle2Icon size={15} color="#15803d" />
+                  <span>Crop Matched: Diagnosing <b>{result.plant}</b> leaf</span>
+                </div>
+              )}
 
               <h2 className="disease-title">
                 {result.status === "Healthy" ? `${result.plant} (Healthy)` : result.disease}
@@ -391,7 +575,7 @@ function PlantDiseasePage() {
                 </div>
               )}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
 
